@@ -24,7 +24,7 @@ Notation "ln1 ▷ ln2" := (composeLn ln1 ln2) (at level 40, left associativity).
 
 Definition modifyLn {S A} (ln : lens S A) (f : A -> A) : S -> S :=
   fun s => update ln s (f (view ln s)).
-Notation "ln !~ f" := (modifyLn ln f) (at level 40, no associativity).
+Notation "ln %~ f" := (modifyLn ln f) (at level 40, no associativity).
 
 
 (* Prism datatype and definitions *)

@@ -13,7 +13,7 @@ Open Scope program_scope.
 
 (* Data layer *)
 
-Record address : Type := mkAddress
+Record address := mkAddress
 { zip : nat
 ; region : option string
 }.
@@ -28,7 +28,7 @@ Definition regionLn : lens address (option string) :=
 (* Business logic *)
 
 Definition modifyZip (f : nat -> nat) : address -> address :=
-  zipLn !~ f.
+  zipLn %~ f.
 
 Definition modifyRegion (f : string -> string) : address -> address :=
   (regionLn ▶ somePr) ?~ f.
@@ -40,14 +40,14 @@ Definition modifyRegion (f : string -> string) : address -> address :=
 
 (* Ad hoc algebras *)
 
-Class Address (p : Type -> Type) : Type :=
+Class Address (p : Type -> Type) `{Monad p} :=
 { getZip : p nat
 ; modZip (f : nat -> nat) : p unit
 ; getRegion : p (option string)
 ; modRegion (f : string -> string) : p unit
 }.
 
-Class Address' (p : Type -> Type) `{Monad p} : Type :=
+Class Address' (p : Type -> Type) `{Monad p} :=
 { zip' : MonadState nat p
 ; getRegion' : p (option string)
 ; modRegion' (f : string -> string) : p unit
