@@ -170,20 +170,11 @@ Arguments mkLens [S A].
 Arguments view [S A].
 Arguments update [S A].
 
-Definition view_update {S A : Type} (ln : lens S A) : Prop :=
-  forall s, update ln s (view ln s) = s.
-
-Definition update_view {S A : Type} (ln : lens S A) : Prop :=
-  forall s a, view ln (update ln s a) = a.
-
-Definition well_behaved {S A : Type} (ln : lens S A) : Prop :=
-  view_update ln /\ update_view ln.
-
-Definition update_update {S A : Type} (ln : lens S A) : Prop :=
-  forall s a1 a2, update ln (update ln s a1) a2 = update ln s a2.
-
-Definition very_well_behaved {S A : Type} (ln : lens S A) : Prop :=
-  well_behaved ln /\ update_update ln.
+Record lensLaws {S A} (ln : lens S A) : Type :=
+{ view_update : forall s, update ln s (view ln s) = s
+; update_view : forall s a, view ln (update ln s a) = a
+; update_update : forall s a1 a2, update ln (update ln s a1) a2 = update ln s a2
+}.
 
 Definition composeLn {S A B} (ln1 : lens S A) (ln2 : lens A B) : lens S B := 
   mkLens ((view ln2) ∘ (view ln1)) 
