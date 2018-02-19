@@ -1,11 +1,9 @@
-Require Import Coq.Program.Basics. 
-Require Import Coq.Strings.String.
+Require Import Program.Basics. 
+Require Import Strings.String.
 Require Import Background.
 
 Open Scope program_scope.
 
-
-(* Zip Code Example *)
 
 (******************)
 (* Optic approach *)
@@ -52,3 +50,6 @@ Class Address' (p : Type -> Type) `{Monad p} :=
 ; getRegion' : p (option string)
 ; modRegion' (f : string -> string) : p unit
 }.
+
+Definition modifyZip' {p} `{Address' p} (f : nat -> nat) : p unit :=
+  @modify _ _ _ zip' f.
