@@ -91,14 +91,13 @@ Record lensAlgLaws {p A} `{Monad p} (ln : lensAlg p A) : Type :=
 
 (* Zip example *)
 
-Class Address'' (p : Type -> Type) `{Monad p} :=
-{ zip'' : lensAlg p nat
-; getRegion'' : p (option string)
-; modRegion'' (f : string -> string) : p unit
+Class Address (p : Type -> Type) `{Monad p} :=
+{ zip  : lensAlg p nat
+; city : lensAlg p string
 }.
 
-Definition modifyZip (f : nat -> nat) {p} `{Address'' p} : p unit :=
-  modify zip'' f.
+Definition modifyZip (f : nat -> nat) {p} `{Address p} : p unit :=
+  modify zip f.
 
-Definition getZip {p} `{Address'' p} : p nat :=
-  get zip''.
+Definition getCity {p} `{Address p} : p string :=
+  get city.
