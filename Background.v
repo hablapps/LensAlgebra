@@ -8,6 +8,19 @@ Open Scope program_scope.
 (* Typeclasses *)
 (***************)
 
+(* Natural Transformation *)
+
+Class natTrans (f g : Type -> Type) : Type := mkNatTrans
+{ runNatTrans {X} : f X -> g X }.
+Arguments mkNatTrans [f g].
+Arguments runNatTrans [f g] _ [X].
+Notation "f ~> g" := (natTrans f g) (at level 50, left associativity).
+
+Definition composeNT {f g h : Type -> Type} 
+                     (nt1 : g ~> h) (nt2 : f ~> g) : f ~> h :=
+  mkNatTrans (fun _ fx => runNatTrans nt1 (runNatTrans nt2 fx)).
+Notation "f • g" := (composeNT f g) (at level 40, left associativity).
+
 (* Monad *)
 
 Class Monad (m : Type -> Type) : Type :=
@@ -23,6 +36,14 @@ Class MonadLaws (m : Type -> Type) `{Monad m} :=
 ; assoc : forall {A B C} (ma : m A) (f : A -> m B) (g : B -> m C),
                  ma >>= f >>= g = ma >>= (fun x => f x >>= g)
 }.
+
+Definition monad_morphism {f g : Type -> Type} 
+                         `{Monad f, Monad g} 
+                          (morph : f ~> g) : Prop :=
+  (forall X (x : X), runNatTrans morph (ret x) = ret x) /\
+  (forall A B (fa : f A) (f : A -> f B),
+    runNatTrans morph (fa >>= f) = 
+    runNatTrans morph fa >>= (fun a => runNatTrans morph (f a))).
 
 (* MonadState *)
 
@@ -155,6 +176,32 @@ Lemma eval_ma_gtgt_retx_is_x :
            evalState (m >> ret x) s = x.
 Proof. i_state_reason. Qed.
 
+Lemma exec_ma_gtgt_retx_is_exec_ma :
+    forall {S A X} (m : state S A) (s : S) (x : X),
+           execState (m >> ret x) s = execState m s.
+Proof. i_state_reason. Qed.
+
+Lemma exec_ret_is_s :
+    forall {S X} (s : S) (x : X),
+           execState (ret x) s = s.
+Proof. i_state_reason. Qed.
+
+Theorem get_leaves_s_as_is : 
+    forall {S A}
+           {ms : MonadState A (state S)} 
+           {msl : @MonadStateLaws A (state S) _ ms} (s : S),
+           execState get s = s.
+Proof.
+  intros.
+  rewrite <- (exec_ret_is_s s tt).
+  assert (G : execState get (execState (ret tt) s) =
+              execState get s).
+  { now rewrite (exec_ret_is_s s tt). }
+  rewrite G.
+  rewrite <- (non_eff_get (ret tt)).
+  now rewrite exec_ma_gtgt_retx_is_exec_ma.
+Qed.
+
 
 (**********)
 (* Optics *)
@@ -230,3 +277,30 @@ Definition composeLnPr {S A B} (ln : lens S A) (pr : prism A B) : affine S B :=
                        | none => s
                        end).
 Notation "ln ▶ pr" := (composeLnPr ln pr) (at level 40, left associativity).
+
+
+(* Utilities to deal with functional extensionality and monads *)
+
+Theorem monadic_extensionality_1 : forall {m A B} `{Monad m}
+                           {ma : m A} 
+                           (f : A -> m B)
+                           (g : A -> m B), 
+    (forall (a : A), f a = g a) -> (ma >>= f = ma >>= g).
+Proof.
+  intros.
+  unwrap_layer.
+  auto.
+Qed.
+
+Theorem monadic_extensionality_2 : forall {m A B C} `{Monad m}
+                           {ma : m A} {f : A -> m B} 
+                           (k1 : A * B -> m C)
+                           (k2 : A * B -> m C), 
+    (forall (a : A) (b : B), k1 (a, b) = k2 (a, b)) ->
+    (ma >>= (fun a => f a >>= (fun b => k1 (a, b))) =
+     ma >>= (fun a => f a >>= (fun b => k2 (a, b)))).
+Proof.
+  intros.
+  repeat unwrap_layer.
+  auto.
+Qed.

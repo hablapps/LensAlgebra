@@ -1,4 +1,5 @@
-Require Import Coq.Program.Basics. 
+Require Import Program.Basics.
+Require Import FunctionalExtensionality.
 Require Import Strings.String.
 Require Import Background.
 
@@ -24,6 +25,52 @@ Instance lens_2_ms {S A} (ln : lens S A) : MonadState A (state S) :=
 { get   := mkState (fun s => (view ln s, s))
 ; put a := mkState (fun s => (tt, update ln s a))
 }.
+
+Theorem ms_iso_lens : forall {S A} 
+                             (ln : lens S A)
+                             (ms : MonadState A (state S)),
+    lensLaws ln -> 
+    @MonadStateLaws _ _ _ ms ->
+    ((ms_2_lens ∘ lens_2_ms) ln = ln) /\ 
+    ((lens_2_ms ∘ ms_2_lens) ms = ms).
+Proof.
+  unfold ms_2_lens. unfold lens_2_ms. 
+  unfold compose.
+  intros.
+  split.
+
+  - destruct ln.
+    auto.
+
+  - simpl.
+    assert (G0 : {| runState := fun s : S => (evalState get s, s) |} =
+                 {| runState := fun s : S => (evalState get s, execState get s) |}).
+    { unwrap_layer.
+      apply f_equal.
+      now rewrite get_leaves_s_as_is. }
+    rewrite G0.
+    destruct ms.
+    simpl.
+    assert (G1 : {| runState := fun s : S => (evalState get s, execState get s) |} =
+                 get).
+    { destruct get.
+      unfold evalState. unfold execState.
+      unwrap_layer.
+      simpl.
+      now destruct (runState x). }
+    rewrite G1.
+    assert (G2 : (fun a : A => {| runState := fun s : S => (tt, execState (put a) s) |}) =
+                 put).
+    { apply functional_extensionality.
+      intros.
+      destruct (put x).
+      unwrap_layer.
+      unfold execState.
+      simpl.
+      destruct (runState x0).
+      now destruct u. }
+    now rewrite G2.
+Qed.
 
 Theorem MonadState_state_s_induces_lens : 
     forall {S A : Type} (ms : MonadState A (state S)),
@@ -72,20 +119,20 @@ Qed.
 (* Lens Algebra definition, just a record *)
 
 Record lensAlg (p : Type -> Type) (A : Type) `{M : Monad p} : Type :=
-{ get : p A
-; put : A -> p unit
-; modify (f : A -> A) : p unit := get >>= (put ∘ f)
+{ view : p A
+; update : A -> p unit
+; modify (f : A -> A) : p unit := view >>= (update ∘ f)
 }.
-Arguments get [p A _].
-Arguments put [p A _].
+Arguments view [p A _].
+Arguments update [p A _].
 Arguments modify [p A _].
 
 Record lensAlgLaws {p A} `{Monad p} (ln : lensAlg p A) : Type :=
-{ get_get : get ln >>= (fun s1 => get ln >>= (fun s2 => ret (s1, s2))) =
-            get ln >>= (fun s => ret (s, s))
-; get_put : get ln >>= put ln = ret tt
-; put_get : forall s, put ln s >> get ln = put ln s >> ret s
-; put_put : forall s1 s2, put ln s1 >> put ln s2 = put ln s2
+{ view_view : view ln >>= (fun s1 => view ln >>= (fun s2 => ret (s1, s2))) =
+              view ln >>= (fun s => ret (s, s))
+; view_update : view ln >>= update ln = ret tt
+; update_view : forall s, update ln s >> view ln = update ln s >> ret s
+; update_update : forall s1 s2, update ln s1 >> update ln s2 = update ln s2
 }.
 
 
@@ -100,4 +147,4 @@ Definition modifyZip (f : nat -> nat) {p} `{Address p} : p unit :=
   modify zip f.
 
 Definition getCity {p} `{Address p} : p string :=
-  get city.
+  view city.
