@@ -29,7 +29,7 @@ Instance lens_2_ms {S A} (ln : lens S A) : MonadState A (state S) :=
 Theorem ms_iso_lens : forall {S A} 
                              (ln : lens S A)
                              (ms : MonadState A (state S)),
-    lensLaws ln -> 
+    lensLaws ln ->
     @MonadStateLaws _ _ _ ms ->
     ((ms_2_lens ∘ lens_2_ms) ln = ln) /\ 
     ((lens_2_ms ∘ ms_2_lens) ms = ms).
@@ -51,16 +51,16 @@ Proof.
     rewrite G0.
     destruct ms.
     simpl.
-    assert (G1 : {| runState := fun s : S => (evalState get s, execState get s) |} =
-                 get).
+    assert (G1 : 
+      {| runState := fun s : S => (evalState get s, execState get s) |} = get).
     { destruct get.
       unfold evalState. unfold execState.
       unwrap_layer.
       simpl.
       now destruct (runState x). }
     rewrite G1.
-    assert (G2 : (fun a : A => {| runState := fun s : S => (tt, execState (put a) s) |}) =
-                 put).
+    assert (G2 : 
+      (fun a : A => {| runState := fun s : S => (tt, execState (put a) s) |}) = put).
     { apply functional_extensionality.
       intros.
       destruct (put x).
