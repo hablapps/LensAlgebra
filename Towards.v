@@ -135,6 +135,50 @@ Record lensAlgLaws {p A} `{Monad p} (ln : lensAlg p A) : Type :=
 ; update_update : forall s1 s2, update ln s1 >> update ln s2 = update ln s2
 }.
 
+Lemma general_viewview : 
+    forall {p : Type -> Type} {A X : Type}
+          `{ml : MonadLaws p}
+           (ln : lensAlg p A)
+           (lnl : lensAlgLaws ln)
+           (k : A * A -> p X),
+           view ln >>= (fun x1 => view ln >>= (fun x2 => k (x1, x2))) = 
+           view ln >>= (fun x1 => k (x1, x1)).
+Proof.
+  intros.
+  destruct ml.
+  destruct lnl.
+  assert (G : view ln >>= (fun x1 : A => k (x1, x1)) =
+              view ln >>= (fun x1 : A => ret (x1, x1) >>= k)).
+  { unwrap_layer. now rewrite left_id. }
+  rewrite G.
+  rewrite <- assoc.
+  rewrite <- view_view0.
+  rewrite -> assoc.
+  unwrap_layer.
+  rewrite -> assoc.
+  unwrap_layer.
+  now rewrite left_id.
+Qed.
+
+Lemma non_eff_view : 
+    forall  {p : Type -> Type} {A}
+           `{ml : MonadLaws p}
+            (ln : lensAlg p A)
+            (lnl : lensAlgLaws ln)
+            {X}
+            (k : p X),
+    view ln >> k = k.
+Proof.
+  intros.
+  pose proof (@general_viewview p A X H ml ln lnl) as J.
+  destruct ml.
+  destruct lnl.
+  rewrite <- (left_id unit _ tt (fun _ => k)).
+  rewrite <- view_update0.
+  repeat rewrite assoc.
+  now rewrite (J (fun pair => update ln (snd pair) >> k)).
+Qed.
+
 
 (* Zip example *)
 
