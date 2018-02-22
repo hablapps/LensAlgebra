@@ -1,4 +1,5 @@
 Require Import Program.Basics.
+Require Import Strings.String.
 Require Import Background.
 Require Import Towards.
 Require Import FunctionalExtensionality.
@@ -174,6 +175,20 @@ Definition lensAlgHom (p q : Type -> Type) (A : Type)
                      `{Monad p} `{MonadState A q} :=
   q ~> p.
 
+Definition view' {p q A} `{Monad p} `{MonadState A q} 
+                 (φ : lensAlgHom p q A) : p A :=
+  runNatTrans φ get.
+
+Definition update' {p q A} `{Monad p} `{MonadState A q} 
+                   (φ : lensAlgHom p q A)
+                   (a : A) : p unit :=
+  runNatTrans φ (put a).
+
+Definition modify' {p q A} `{Monad p} `{MonadState A q} 
+                   (φ : lensAlgHom p q A)
+                   (f : A -> A) : p unit :=
+  runNatTrans φ (mod f).
+
 Definition composeLnAlgHom {p q r A B}
    `{MonadState B r} `{MonadState A q} `{Monad p}
     (φ : lensAlgHom p q A) (ψ : lensAlgHom q r B) : lensAlgHom p r B := 
@@ -246,3 +261,52 @@ Qed.
 
 
 (* Zip example *)
+
+Record Address (p : Type -> Type) `{Monad p} := mkAddress
+{ zip  : lensAlg' p nat
+; city : lensAlg' p string
+}.
+Arguments zip [p _].
+Arguments city [p _].
+
+(* 1st approach *)
+
+Record Person (p : Type -> Type) `{Monad p} := mkPerson
+{ name : lensAlg' p string
+; q : Type -> Type
+; Add : Type
+; M : Monad q
+; MS : MonadState Add q
+; address_ev : Address q
+; address : lensAlgHom p q Add
+}.
+Arguments address [p _].
+Arguments address_ev [p _ _].
+
+Definition modifyPersonZip (f : nat -> nat) {p} `{Monad p}
+                           (data : Person p) : p unit :=
+  modify' (address data • zip address_ev) f.
+
+Definition getPersonCity {p} `{Monad p}
+                         (data : Person p) : p string :=
+  view' (address data • city address_ev).
+
+(* 2nd approach *)
+
+Record Person' (p q : Type -> Type) (Add : Type) 
+              `{Monad p} `{MonadState Add q} := mkPerson'
+{ name' : lensAlg' p string
+; address_ev' : Address q
+; address' : lensAlgHom p q Add
+}.
+Arguments address' [p _ _ _ _ _].
+Arguments address_ev' [p _ _ _ _ _].
+
+Definition modifyPersonZip' (f : nat -> nat) 
+                            {p q Add} `{Monad p} `{MonadState Add q}
+                            (data : Person' p q Add) : p unit :=
+  modify' (address' data • zip (address_ev' data)) f.
+
+Definition getPersonCity' {p q Add} `{Monad p} `{MonadState Add q}
+                         (data : Person' p q Add) : p string :=
+  view' (address' data • city (address_ev' data)).

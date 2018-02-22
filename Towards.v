@@ -182,13 +182,16 @@ Qed.
 
 (* Zip example *)
 
-Class Address (p : Type -> Type) `{Monad p} :=
+Record Address (p : Type -> Type) `{Monad p} := mkAddress
 { zip  : lensAlg p nat
 ; city : lensAlg p string
 }.
+Arguments zip [p _].
+Arguments city [p _].
 
-Definition modifyZip (f : nat -> nat) {p} `{Address p} : p unit :=
-  modify zip f.
+Definition modifyZip (f : nat -> nat) 
+                     {p} `{Monad p} (data : Address p) : p unit :=
+  modify (zip data) f.
 
-Definition getCity {p} `{Address p} : p string :=
-  view city.
+Definition getCity {p} `{Monad p} (data : Address p) : p string :=
+  view (city data).

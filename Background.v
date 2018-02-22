@@ -50,7 +50,7 @@ Definition monad_morphism {f g : Type -> Type}
 Class MonadState (A : Type) (m : Type -> Type) `{Monad m} :=
 { get : m A
 ; put : A -> m unit
-; modify : (A -> A) -> m unit := fun f => get >>= (put ∘ f)
+; mod : (A -> A) -> m unit := fun f => get >>= (put ∘ f)
 }.
 
 Class MonadStateLaws (A : Type) (m : Type -> Type) `{MonadState A m} :=
