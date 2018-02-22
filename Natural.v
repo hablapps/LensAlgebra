@@ -188,6 +188,7 @@ Definition modify' {p q A} `{Monad p} `{MonadState A q}
                    (φ : lensAlgHom p q A)
                    (f : A -> A) : p unit :=
   runNatTrans φ (mod f).
+Notation "φ ~ f" := (modify' φ f) (at level 40, no associativity).
 
 Definition composeLnAlgHom {p q r A B}
    `{MonadState B r} `{MonadState A q} `{Monad p}
@@ -285,7 +286,7 @@ Arguments address_ev [p _ _].
 
 Definition modifyPersonZip (f : nat -> nat) {p} `{Monad p}
                            (data : Person p) : p unit :=
-  modify' (address data • zip address_ev) f.
+  (address data • zip address_ev) ~ f.
 
 Definition getPersonCity {p} `{Monad p}
                          (data : Person p) : p string :=
@@ -305,7 +306,7 @@ Arguments address_ev' [p _ _ _ _ _].
 Definition modifyPersonZip' (f : nat -> nat) 
                             {p q Add} `{Monad p} `{MonadState Add q}
                             (data : Person' p q Add) : p unit :=
-  modify' (address' data • zip (address_ev' data)) f.
+  (address' data • zip (address_ev' data)) ~ f.
 
 Definition getPersonCity' {p q Add} `{Monad p} `{MonadState Add q}
                          (data : Person' p q Add) : p string :=
