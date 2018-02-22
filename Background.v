@@ -281,6 +281,8 @@ Notation "ln ▶ pr" := (composeLnPr ln pr) (at level 40, left associativity).
 
 (* Utilities to deal with functional extensionality and monads *)
 
+Ltac functional_extensionality_i := apply functional_extensionality; intros.
+
 Theorem monadic_extensionality_1 : forall {m A B} `{Monad m}
                            {ma : m A} 
                            (f : A -> m B)

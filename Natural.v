@@ -35,19 +35,18 @@ Proof.
   destruct H0.
   split; simpl.
 
-  - destruct H1.
+  - (* lensAlg'_2_lensAlg ∘ lensAlg_2_lensAlg' *)
+    destruct H1.
     rewrite <- (monadic_extensionality_1 _ _ update_view).
     rewrite <- assoc.
     rewrite view_update.
     rewrite left_id.
     assert (G : (fun a : A => view ln >> (update ln a >> ret tt)) = update ln).
-    { apply functional_extensionality.
-      intros.
+    { functional_extensionality_i.
       assert (G1 : update ln x >> ret tt = update ln x >>= ret).
       { unfold bind.
         apply f_equal.
-        apply functional_extensionality.
-        intros.
+        functional_extensionality_i.
         now destruct x0. }
       rewrite G1.
       rewrite right_id.
@@ -55,7 +54,8 @@ Proof.
     rewrite G.
     now destruct ln.
 
-  - destruct H2.
+  - (* lensAlg_2_lensAlg' ∘ lensAlg'_2_lensAlg *)
+    destruct H2.
     destruct ln'.
     simpl in *.
     apply f_equal.
@@ -170,5 +170,79 @@ Qed.
 
 (* Lens algebra homomorphism *)
 
+Definition lensAlgHom (p q : Type -> Type) (A : Type) 
+                     `{Monad p} `{MonadState A q} :=
+  q ~> p.
 
-(* Composition example *)
+Definition composeLnAlgHom {p q r A B}
+   `{MonadState B r} `{MonadState A q} `{Monad p}
+    (φ : lensAlgHom p q A) (ψ : lensAlgHom q r B) : lensAlgHom p r B := 
+  φ • ψ.
+
+Theorem closed_under_composeLnAlgHom : 
+    forall  {p q r A B}
+           `{MonadState B r} `{MonadState A q} `{Monad p}
+            (φ : lensAlgHom p q A)
+            (ψ : lensAlgHom q r B),
+            monad_morphism φ ->
+            monad_morphism ψ ->
+            monad_morphism (φ • ψ).
+Proof.
+  unfold monad_morphism.
+  intros.
+  destruct H4 as [QP1 QP2].
+  destruct H5 as [RQ1 RQ2].
+  split; intros; simpl; [rewrite RQ1 | rewrite RQ2]; auto.
+Qed.
+
+Definition lensAlgHom_2_lensAlg {p q A} `{Monad p} `{MonadState A q} 
+                                (φ : lensAlgHom p q A) : lensAlg p A :=
+{| view := runNatTrans φ get
+;  update a := runNatTrans φ (put a)
+|}.
+
+Theorem lensAlgHom_induces_lensAlg :
+    forall {p q A} 
+          `{Monad p} `{MonadStateLaws A q}
+           (φ : lensAlgHom p q A),
+           monad_morphism φ -> 
+           lensAlgLaws (lensAlgHom_2_lensAlg φ).
+Proof.
+  unfold monad_morphism.
+  unfold lensAlgHom_2_lensAlg.
+  intros.
+  destruct H2 as [GG GP PG PP].
+  destruct H3 as [QP1 QP2].
+  split; simpl; intros.
+
+  - (* get_get *)
+    symmetry in QP1.
+    rewrite (monadic_extensionality_2 
+               _
+               (fun pair => runNatTrans φ (ret pair)) 
+               (fun a1 a2 => QP1 _ (a1, a2))).
+    symmetry in QP2.
+    rewrite (monadic_extensionality_1 _ _ (fun _ => QP2 _ _ _ _)).
+    rewrite QP2.
+    rewrite GG.
+    rewrite (monadic_extensionality_1 _ _ (fun _ => QP1 _ _)).
+    auto.
+
+  - (* get_put *)
+    rewrite <- QP2.
+    rewrite GP.
+    now rewrite QP1.
+
+  - (* put_get *)
+    rewrite <- QP2.
+    rewrite PG.
+    rewrite -> QP2.
+    now rewrite QP1.
+
+  - (* put_put *)
+    rewrite <- QP2.
+    now rewrite PP.
+Qed.
+
+
+(* Zip example *)

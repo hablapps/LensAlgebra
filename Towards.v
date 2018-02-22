@@ -37,15 +37,16 @@ Proof.
   unfold ms_2_lens. unfold lens_2_ms. 
   unfold compose.
   intros.
-  split.
+  split; simpl.
 
-  - destruct ln.
+  - (* ms_2_lens ∘ lens_2_ms *)
+    destruct ln.
     auto.
 
-  - simpl.
-    assert (G0 : {| runState := fun s : S => (evalState get s, s) |} =
-                 {| runState := fun s : S => (evalState get s, execState get s) |}).
-    { unwrap_layer.
+  - (* lens_2_ms ∘ ms_2_lens *)
+    assert (G0 : (fun s : S => (evalState get s, s)) =
+                 (fun s : S => (evalState get s, execState get s))).
+    { functional_extensionality_i.
       apply f_equal.
       now rewrite get_leaves_s_as_is. }
     rewrite G0.
@@ -61,8 +62,7 @@ Proof.
     rewrite G1.
     assert (G2 : 
       (fun a : A => {| runState := fun s : S => (tt, execState (put a) s) |}) = put).
-    { apply functional_extensionality.
-      intros.
+    { functional_extensionality_i.
       destruct (put x).
       unwrap_layer.
       unfold execState.
