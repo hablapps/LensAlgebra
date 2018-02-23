@@ -281,6 +281,14 @@ Notation "φ ~ f" := (modify φ f) (at level 40, no associativity).
 
 (* Zip example *)
 
+(* naive approach *)
+
+Definition modifyZip {p q r A} `{Monad p, MonadState A q, MonadState nat r}
+                     (f : nat -> nat)
+                     (addressLn : lensAlgHom p q A)
+                     (zipLn : lensAlgHom q r nat) : p unit :=
+  (addressLn ▷ zipLn) ~ f.
+
 (* data layer *)
 
 Record Address (p : Type -> Type) `{Monad p} := mkAddress
@@ -298,13 +306,13 @@ Record Person (p : Type -> Type) `{Monad p} := mkPerson
 ; M : Monad q
 ; MS : MonadState A q
 ; address_ev : Address q
-; addressLn : lensAlgHom p q A
+; address : lensAlgHom p q A
 }.
 Arguments mkPerson [p _].
 Arguments name [p _].
 Arguments q [p _].
 Arguments A [p _].
-Arguments addressLn [p _].
+Arguments address [p _].
 Arguments address_ev [p _].
 
 (* business logic *)
@@ -317,14 +325,16 @@ Definition cityLn {p} `{Monad p}
                   {data : Person p} : lensAlg' (q data) string :=
   city (address_ev data).
 
-Definition modifyPersonZip {p} `{Monad p}
+Definition modifyZip {p} `{Monad p}
                            (f : nat -> nat)
                            (data : Person p) : p unit :=
-  (addressLn data ▷ zipLn) ~ f.
+  let addressLn := address data in
+  let zipLn     := zip (address_ev data) in
+  (addressLn ▷ zipLn) ~ f.
 
 Definition viewPersonCity {p} `{Monad p}
                           (data : Person p) : p string :=
-  view (addressLn data ▷ cityLn).
+  view (address data ▷ cityLn).
 
 Definition updateName {p} `{Monad p}
                            (s : string)
@@ -339,11 +349,11 @@ Definition Address_immutable :=
 
 Definition Person_immutable :=
   mkPerson (lens_2_lens' Background.name)
-           (state address)
-            address _ _
+           (state Background.address)
+            _ _ _
             Address_immutable
            (lens_2_lens' Background.addr).
 
 Example modify_jesus : 
-  execState (modifyPersonZip (fun z => z + 1) Person_immutable) jesus = jesus'.
+  execState (modifyZip (fun z => z + 1) Person_immutable) jesus = jesus'.
 Proof. auto. Qed.
