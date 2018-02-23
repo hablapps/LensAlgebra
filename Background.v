@@ -1,4 +1,5 @@
 Require Import Program.Basics.
+Require Import Strings.String.
 Require Import FunctionalExtensionality.
 
 Open Scope program_scope.
@@ -236,6 +237,15 @@ Definition identityLn A : lens A A :=
   mkLens id (fun _ => id).
 
 
+(* Alternative lens definition *)
+
+Definition lens' S A : Type := state A ~> state S.
+
+Definition lens_2_lens' {S A} (ln : lens S A) : lens' S A :=
+  mkNatTrans (fun X sax => mkState (fun s => let (x, a') := runState sax (view ln s)
+                                             in (x, update ln s a'))).
+
+
 (* Prism datatype and definitions *)
 
 Record prism (S A : Type) : Type := mkPrism
@@ -277,6 +287,41 @@ Definition composeLnPr {S A B} (ln : lens S A) (pr : prism A B) : affine S B :=
                        | none => s
                        end).
 Notation "ln ▶ pr" := (composeLnPr ln pr) (at level 40, left associativity).
+
+
+(* Lens composition example *)
+
+Record address : Type := mkAddress
+{ _city : string
+; _zip : nat
+}.
+
+Record person : Type := mkPerson
+{ _name : string
+; _addr : address
+}.
+
+Definition city : lens address string :=
+  mkLens _city (fun a c' => mkAddress c' (_zip a)).
+
+Definition zip : lens address nat :=
+  mkLens _zip (fun a z' => mkAddress (_city a) z').
+
+Definition name : lens person string :=
+ mkLens _name (fun p n' => mkPerson n' (_addr p)).
+
+Definition addr : lens person address :=
+ mkLens _addr (fun p a' => mkPerson (_name p) a').
+
+Definition modifyZip (f : nat -> nat) : person -> person :=
+  (addr ▷ zip) %~ f.
+
+Definition jesus := mkPerson "jesus" (mkAddress "mostoles" 289).
+
+Definition jesus' := mkPerson "jesus" (mkAddress "mostoles" 290).
+
+Example modify_jesus : modifyZip (fun z => z + 1) jesus = jesus'.
+Proof. auto. Qed.
 
 
 (* Utilities to deal with functional extensionality and monads *)

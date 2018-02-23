@@ -126,6 +126,7 @@ Record lensAlg (p : Type -> Type) (A : Type) `{M : Monad p} : Type :=
 Arguments view [p A _].
 Arguments update [p A _].
 Arguments modify [p A _].
+Notation "ln ~ f" := (modify ln f) (at level 40, no associativity).
 
 Record lensAlgLaws {p A} `{Monad p} (ln : lensAlg p A) : Type :=
 { view_view : view ln >>= (fun s1 => view ln >>= (fun s2 => ret (s1, s2))) =
@@ -191,7 +192,7 @@ Arguments city [p _].
 
 Definition modifyZip (f : nat -> nat) 
                      {p} `{Monad p} (data : Address p) : p unit :=
-  modify (zip data) f.
+  (zip data) ~ f.
 
 Definition getCity {p} `{Monad p} (data : Address p) : p string :=
   view (city data).

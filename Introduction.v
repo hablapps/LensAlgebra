@@ -52,4 +52,4 @@ Class Address' (p : Type -> Type) `{Monad p} :=
 }.
 
 Definition modifyZip' {p} `{Address' p} (f : nat -> nat) : p unit :=
-  @modify _ _ _ zip' f.
+  @mod _ _ _ zip' f.

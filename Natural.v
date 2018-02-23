@@ -5,6 +5,18 @@ Require Import Towards.
 Require Import FunctionalExtensionality.
 
 
+(* A naive composition approach *)
+
+Definition zipAddrLn {p q}
+                    `{Monad p, Monad q}
+                     (addressLn : lensAlg p address)
+                     (zipLn : lensAlg q nat)
+                     (φ : q ~> p) : lensAlg p nat :=
+{| view := runNatTrans φ (view zipLn)
+;  update zip' := runNatTrans φ (update zipLn zip')
+|}.
+
+
 (* Alternative lens algebra (or MonadState) definition *)
 
 Definition lensAlg' (p : Type -> Type) (A : Type) :=
@@ -168,6 +180,11 @@ Proof.
     now rewrite <- H1.
 Qed.
 
+Definition zipAddrLn' {p} `{Monad p}
+                      (addressLn : lensAlg' p address)
+                      (zipLn : lensAlg' (state address) nat) : lensAlg' p nat :=
+  addressLn • zipLn.
+
 
 (* Lens algebra homomorphism *)
 
@@ -175,25 +192,11 @@ Definition lensAlgHom (p q : Type -> Type) (A : Type)
                      `{Monad p} `{MonadState A q} :=
   q ~> p.
 
-Definition view' {p q A} `{Monad p} `{MonadState A q} 
-                 (φ : lensAlgHom p q A) : p A :=
-  runNatTrans φ get.
-
-Definition update' {p q A} `{Monad p} `{MonadState A q} 
-                   (φ : lensAlgHom p q A)
-                   (a : A) : p unit :=
-  runNatTrans φ (put a).
-
-Definition modify' {p q A} `{Monad p} `{MonadState A q} 
-                   (φ : lensAlgHom p q A)
-                   (f : A -> A) : p unit :=
-  runNatTrans φ (mod f).
-Notation "φ ~ f" := (modify' φ f) (at level 40, no associativity).
-
 Definition composeLnAlgHom {p q r A B}
    `{MonadState B r} `{MonadState A q} `{Monad p}
     (φ : lensAlgHom p q A) (ψ : lensAlgHom q r B) : lensAlgHom p r B := 
   φ • ψ.
+Notation "f ▷ g" := (composeLnAlgHom f g) (at level 40, left associativity).
 
 Theorem closed_under_composeLnAlgHom : 
     forall  {p q r A B}
@@ -260,54 +263,87 @@ Proof.
     now rewrite PP.
 Qed.
 
+Definition view {p q A} `{Monad p} `{MonadState A q} 
+                (φ : lensAlgHom p q A) : p A :=
+  view (lensAlgHom_2_lensAlg φ).
+
+Definition update {p q A} `{Monad p} `{MonadState A q} 
+                  (φ : lensAlgHom p q A)
+                  (a : A) : p unit :=
+  update (lensAlgHom_2_lensAlg φ) a.
+
+Definition modify {p q A} `{Monad p} `{MonadState A q} 
+                  (φ : lensAlgHom p q A)
+                  (f : A -> A) : p unit :=
+  modify (lensAlgHom_2_lensAlg φ) f.
+Notation "φ ~ f" := (modify φ f) (at level 40, no associativity).
+
 
 (* Zip example *)
+
+(* data layer *)
 
 Record Address (p : Type -> Type) `{Monad p} := mkAddress
 { zip  : lensAlg' p nat
 ; city : lensAlg' p string
 }.
+Arguments mkAddress [p _].
 Arguments zip [p _].
 Arguments city [p _].
-
-(* 1st approach *)
 
 Record Person (p : Type -> Type) `{Monad p} := mkPerson
 { name : lensAlg' p string
 ; q : Type -> Type
-; Add : Type
+; A : Type
 ; M : Monad q
-; MS : MonadState Add q
+; MS : MonadState A q
 ; address_ev : Address q
-; address : lensAlgHom p q Add
+; addressLn : lensAlgHom p q A
 }.
-Arguments address [p _].
-Arguments address_ev [p _ _].
+Arguments mkPerson [p _].
+Arguments name [p _].
+Arguments q [p _].
+Arguments A [p _].
+Arguments addressLn [p _].
+Arguments address_ev [p _].
 
-Definition modifyPersonZip (f : nat -> nat) {p} `{Monad p}
+(* business logic *)
+
+Definition zipLn {p} `{Monad p}
+                 {data : Person p} : lensAlg' (q data) nat :=
+  zip (address_ev data).
+
+Definition cityLn {p} `{Monad p}
+                  {data : Person p} : lensAlg' (q data) string :=
+  city (address_ev data).
+
+Definition modifyPersonZip {p} `{Monad p}
+                           (f : nat -> nat)
                            (data : Person p) : p unit :=
-  (address data • zip address_ev) ~ f.
+  (addressLn data ▷ zipLn) ~ f.
 
-Definition getPersonCity {p} `{Monad p}
-                         (data : Person p) : p string :=
-  view' (address data • city address_ev).
+Definition viewPersonCity {p} `{Monad p}
+                          (data : Person p) : p string :=
+  view (addressLn data ▷ cityLn).
 
-(* 2nd approach *)
+Definition updateName {p} `{Monad p}
+                           (s : string)
+                           (data : Person p) : p unit :=
+  update (name data) s.
 
-Record Person' (p q : Type -> Type) (Add : Type) 
-              `{Monad p} `{MonadState Add q} := mkPerson'
-{ name' : lensAlg' p string
-; address_ev' : Address q
-; address' : lensAlgHom p q Add
-}.
-Arguments address' [p _ _ _ _ _].
-Arguments address_ev' [p _ _ _ _ _].
+(* instantiation *)
 
-Definition modifyPersonZip' (f : nat -> nat) 
-                            {p q Add} `{Monad p} `{MonadState Add q}
-                            (data : Person' p q Add) : p unit :=
-  (address' data • zip (address_ev' data)) ~ f.
+Definition Address_immutable :=
+  mkAddress (lens_2_lens' Background.zip)
+            (lens_2_lens' Background.city).
 
-Definition getPersonCity' {p q Add} `{Monad p} `{MonadState Add q}
-                         (data : Person' p q Add) : p string :=
-  view' (address' data • city (address_ev' data)).
+Definition Person_immutable :=
+  mkPerson (lens_2_lens' Background.name)
+           (state address)
+            address _ _
+            Address_immutable
+           (lens_2_lens' Background.addr).
+
+Example modify_jesus : 
+  execState (modifyPersonZip (fun z => z + 1) Person_immutable) jesus = jesus'.
+Proof. auto. Qed.
