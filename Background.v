@@ -46,6 +46,59 @@ Definition monad_morphism {f g : Type -> Type}
     runNatTrans morph (fa >>= f) = 
     runNatTrans morph fa >>= (fun a => runNatTrans morph (f a))).
 
+Theorem reta_gtgt_retb_is_retb :
+    forall m `{MonadLaws m}, 
+    (forall A B (a : A) (b : B), ret a >> ret b = ret b).
+Proof.
+  intros.
+  destruct H0.
+  apply left_id0.
+Qed.
+
+Ltac functional_extensionality_i := apply functional_extensionality; intros.
+
+Theorem functional_extensionality_1 :
+    forall {A B} 
+           (f : A -> B)
+           (g : A -> B), 
+    (forall (a : A), f a = g a) -> (fun a => f a) = (fun a => g a).
+Proof.
+  intros.
+  functional_extensionality_i.
+  now rewrite H.
+Qed.
+
+Ltac unwrap_layer := 
+  apply f_equal;
+  apply functional_extensionality;
+  intros.
+
+Theorem monadic_extensionality_1 : 
+    forall {m A B} `{Monad m}
+           {ma : m A} 
+           (f : A -> m B)
+           (g : A -> m B), 
+    (forall (a : A), f a = g a) -> (ma >>= f = ma >>= g).
+Proof.
+  intros.
+  unwrap_layer.
+  auto.
+Qed.
+
+Theorem monadic_extensionality_2 : 
+    forall {m A B C} `{Monad m}
+           {ma : m A} {f : A -> m B} 
+           (k1 : A * B -> m C)
+           (k2 : A * B -> m C), 
+    (forall (a : A) (b : B), k1 (a, b) = k2 (a, b)) ->
+    (ma >>= (fun a => f a >>= (fun b => k1 (a, b))) =
+     ma >>= (fun a => f a >>= (fun b => k2 (a, b)))).
+Proof.
+  intros.
+  repeat unwrap_layer.
+  auto.
+Qed.
+
 (* MonadState *)
 
 Class MonadState (A : Type) (m : Type -> Type) `{Monad m} :=
@@ -61,11 +114,6 @@ Class MonadStateLaws (A : Type) (m : Type -> Type) `{MonadState A m} :=
 ; put_get : forall s, put s >> get = put s >> ret s
 ; put_put : forall s1 s2, put s1 >> put s2 = put s2
 }.
-
-Ltac unwrap_layer := 
-  apply f_equal;
-  apply functional_extensionality;
-  intros.
 
 Lemma general_getget : 
     forall {M : Type -> Type} {A : Type}
@@ -203,6 +251,74 @@ Proof.
   now rewrite exec_ma_gtgt_retx_is_exec_ma.
 Qed.
 
+Record stateT (S : Type) (m : Type -> Type) `{Monad m} (A : Type) := mkStateT
+{ runStateT : S -> m (A * S)%type }.
+Arguments mkStateT [S m _ A].
+Arguments runStateT [S m _ A].
+
+Instance Monad_stateT (S : Type) (m : Type -> Type) 
+                     `{Monad m} : Monad (stateT S m) :=
+{ ret _ x := mkStateT (fun s => ret (x, s))
+; bind _ _ mx f := mkStateT (fun s => runStateT mx s >>= 
+                                      (fun p => runStateT (f (fst p)) (snd p)))
+}.
+
+Instance MonadLaws_stateT (S : Type) (m : Type -> Type) 
+                         `{MonadLaws m} : MonadLaws (stateT S m).
+Proof.
+  destruct H0.
+  constructor; simpl; intros.
+  
+  - (* left id *)
+    rewrite (functional_extensionality_1
+      (fun s => ret (a, s) >>= (fun p : A * S => runStateT (f (fst p)) (snd p)))
+      (runStateT (f a))
+      (fun s => left_id0 _ _ _ _)).
+    destruct (f a).
+    now unwrap_layer.
+
+  - (* right id *)
+    destruct ma.
+    unwrap_layer.
+    simpl.
+    assert (G : forall A B (p : A * B), ret (fst p, snd p) = ret p).
+    { now destruct p. }
+    rewrite (monadic_extensionality_1 
+      (fun p => ret (fst p, snd p)) _ (fun _ => G _ _ _)).
+    now rewrite right_id0.
+
+  - (* assoc *)
+    unwrap_layer.
+    auto.
+Qed.
+
+Instance MonadState_stateT (S : Type) (m : Type -> Type)
+                          `{Monad m} : MonadState S (stateT S m) :=
+{ get := mkStateT (fun s => ret (s, s))
+; put s' := mkStateT (fun _ => ret (tt, s')) 
+}.
+
+Instance MonadStateLaws_stateT (S : Type) (m : Type -> Type)
+                              `{MonadLaws m} : MonadStateLaws S (stateT S m).
+Proof.
+  destruct H0.
+  constructor; simpl; intros.
+ 
+  - (* get_get *)
+    unwrap_layer.
+    now repeat rewrite left_id0.
+
+  - (* get_put *)
+    unwrap_layer.
+    now rewrite left_id0.
+
+  - (* put_get *)
+    now repeat rewrite left_id0.
+
+  - (* put_put *)
+    now rewrite reta_gtgt_retb_is_retb.
+Qed.
+
 
 (**********)
 (* Optics *)
@@ -322,32 +438,3 @@ Definition jesus' := mkPerson "jesus" (mkAddress "mostoles" 290).
 
 Example modify_jesus : modifyZip (fun z => z + 1) jesus = jesus'.
 Proof. auto. Qed.
-
-
-(* Utilities to deal with functional extensionality and monads *)
-
-Ltac functional_extensionality_i := apply functional_extensionality; intros.
-
-Theorem monadic_extensionality_1 : forall {m A B} `{Monad m}
-                           {ma : m A} 
-                           (f : A -> m B)
-                           (g : A -> m B), 
-    (forall (a : A), f a = g a) -> (ma >>= f = ma >>= g).
-Proof.
-  intros.
-  unwrap_layer.
-  auto.
-Qed.
-
-Theorem monadic_extensionality_2 : forall {m A B C} `{Monad m}
-                           {ma : m A} {f : A -> m B} 
-                           (k1 : A * B -> m C)
-                           (k2 : A * B -> m C), 
-    (forall (a : A) (b : B), k1 (a, b) = k2 (a, b)) ->
-    (ma >>= (fun a => f a >>= (fun b => k1 (a, b))) =
-     ma >>= (fun a => f a >>= (fun b => k2 (a, b)))).
-Proof.
-  intros.
-  repeat unwrap_layer.
-  auto.
-Qed.
