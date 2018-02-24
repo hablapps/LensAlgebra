@@ -143,3 +143,20 @@ Proof.
     rewrite <- assoc.
     now rewrite mupdate_mupdate0.
 Qed.
+
+
+(* bx *)
+
+Record BX (m : Type -> Type) (A B : Type) := mkBX
+{ getL : m A
+; getR : m B
+; putL : A -> m unit
+; putR : B -> m unit
+}.
+Arguments mkBX [m A B].
+
+Definition lens_2_bx {S A} (ln : lens S A) : BX (state S) S A :=
+  mkBX (mkState (fun s => (s, s)))
+       (mkState (fun s => (Background.view ln s, s)))
+       (fun s' => mkState (fun _ => (tt, s')))
+       (fun a' => mkState (fun s => (tt, Background.update ln s a'))).
