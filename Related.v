@@ -160,3 +160,9 @@ Definition lens_2_bx {S A} (ln : lens S A) : BX (state S) S A :=
        (mkState (fun s => (Background.view ln s, s)))
        (fun s' => mkState (fun _ => (tt, s')))
        (fun a' => mkState (fun s => (tt, Background.update ln s a'))).
+
+Definition mLens_2_bx {S A m} `{Monad m} (mln : mLens S A m) : BX (stateT S m) S A :=
+  mkBX (mkStateT (fun s => ret (s, s)))
+       (mkStateT (fun s => ret (mview mln s, s)))
+       (fun s' => mkStateT (fun _ => ret (tt, s')))
+       (fun a' => mkStateT (fun s => mupdate mln s a' >>= (fun s' => ret (tt, s')))). 
