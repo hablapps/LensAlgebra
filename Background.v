@@ -46,7 +46,7 @@ Definition monad_morphism {f g : Type -> Type}
     runNatTrans morph (fa >>= f) = 
     runNatTrans morph fa >>= (fun a => runNatTrans morph (f a))).
 
-Theorem reta_gtgt_retb_is_retb :
+Lemma reta_gtgt_retb_is_retb :
     forall m `{MonadLaws m}, 
     (forall A B (a : A) (b : B), ret a >> ret b = ret b).
 Proof.
@@ -57,7 +57,7 @@ Qed.
 
 Ltac functional_extensionality_i := apply functional_extensionality; intros.
 
-Theorem functional_extensionality_1 :
+Lemma functional_extensionality_1 :
     forall {A B} 
            (f : A -> B)
            (g : A -> B), 
@@ -73,7 +73,7 @@ Ltac unwrap_layer :=
   apply functional_extensionality;
   intros.
 
-Theorem monadic_extensionality_1 : 
+Lemma monadic_extensionality_1 : 
     forall {m A B} `{Monad m}
            {ma : m A} 
            (f : A -> m B)
@@ -85,7 +85,7 @@ Proof.
   auto.
 Qed.
 
-Theorem monadic_extensionality_2 : 
+Lemma monadic_extensionality_2 : 
     forall {m A B C} `{Monad m}
            {ma : m A} {f : A -> m B} 
            (k1 : A * B -> m C)
@@ -235,7 +235,7 @@ Lemma exec_ret_is_s :
            execState (ret x) s = s.
 Proof. i_state_reason. Qed.
 
-Theorem get_leaves_s_as_is : 
+Lemma get_leaves_s_as_is : 
     forall {S A}
            {ms : MonadState A (state S)} 
            {msl : @MonadStateLaws A (state S) _ ms} (s : S),

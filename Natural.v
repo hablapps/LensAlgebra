@@ -33,7 +33,7 @@ Definition lensAlg_2_lensAlg' {p A} `{Monad p}
   mkNatTrans (fun X sax => view ln >>= (fun a => let (x, a') := runState sax a
                                                  in update ln a' >> ret x)).
 
-Lemma lensAlg_iso_lensAlg' : 
+Theorem lensAlg_iso_lensAlg' : 
     forall {p A} `{MonadLaws p} (ln : lensAlg p A) (ln' : lensAlg' p A),
            lensAlgLaws ln -> 
            monad_morphism ln' ->
@@ -198,7 +198,7 @@ Definition composeLnAlgHom {p q r A B}
   φ • ψ.
 Notation "f ▷ g" := (composeLnAlgHom f g) (at level 40, left associativity).
 
-Theorem closed_under_composeLnAlgHom : 
+Lemma closed_under_composeLnAlgHom : 
     forall  {p q r A B}
            `{MonadState B r} `{MonadState A q} `{Monad p}
             (φ : lensAlgHom p q A)
@@ -220,7 +220,7 @@ Definition lensAlgHom_2_lensAlg {p q A} `{Monad p} `{MonadState A q}
 ;  update a := runNatTrans φ (put a)
 |}.
 
-Theorem lensAlgHom_induces_lensAlg :
+Lemma lensAlgHom_induces_lensAlg :
     forall {p q A} 
           `{Monad p} `{MonadStateLaws A q}
            (φ : lensAlgHom p q A),

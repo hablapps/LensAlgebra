@@ -72,7 +72,7 @@ Proof.
     now rewrite G2.
 Qed.
 
-Theorem MonadState_state_s_induces_lens : 
+Lemma MonadState_state_s_induces_lens : 
     forall {S A : Type} (ms : MonadState A (state S)),
            @MonadStateLaws A (state S) _ ms -> lensLaws (ms_2_lens ms).
 Proof.
@@ -101,7 +101,7 @@ Proof.
     now rewrite put_put.
 Qed.
 
-Theorem lens_induces_MonadState_state_s :
+Lemma lens_induces_MonadState_state_s :
     forall {S A : Type} (ln : lens S A),
            lensLaws ln -> @MonadStateLaws A (state S) _ (lens_2_ms ln).
 Proof.

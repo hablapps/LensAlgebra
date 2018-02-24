@@ -97,7 +97,7 @@ Record mLensLaws {S A m} `{Monad m} (mln : mLens S A m) := mkMLensLaws
 
 (* Connection between lens algebras and monadic lenses *)
 
-(* XXX: consider contemplating `Functor` to implement `update` *)
+(* XXX: consider adding `Functor` to implement `update` *)
 Definition mLens_2_lensAlgStateT {S A m} `{Monad m}
                                  (mln : mLens S A m) : lensAlg (stateT S m) A :=
 {| view      := mkStateT (fun s => ret (mview mln s, s))
