@@ -19,7 +19,7 @@ Definition zipAddrLn {p q}
 
 (* Alternative lens algebra (or MonadState) definition *)
 
-Definition lensAlg' (p : Type -> Type) (A : Type) :=
+Definition lensAlg' (p : Type -> Type) `{Monad p} (A : Type) :=
   state A ~> p.
 
 Definition lensAlg'_2_lensAlg {p A} `{Monad p} 
@@ -44,12 +44,12 @@ Proof.
   unfold lensAlg'_2_lensAlg.
   unfold lensAlg_2_lensAlg'.
   unfold compose.
-  pose proof (@non_eff_view p A H H0 ln H1) as K.
-  destruct H0.
+  pose proof (@non_eff_view p A H H0 H1 ln) as K.
+  destruct H1.
   split; simpl.
 
   - (* lensAlg'_2_lensAlg ∘ lensAlg_2_lensAlg' *)
-    destruct H1.
+    destruct H2.
     rewrite <- (monadic_extensionality_1 _ _ update_view).
     rewrite <- assoc.
     rewrite view_update.
@@ -74,6 +74,7 @@ Proof.
     apply f_equal.
     extensionality X.
     extensionality sax.
+    destruct H3; simpl in *.
     assert (G : runNatTrans A {| runState := fun s : A => (s, s) |} >>=
                 (fun a : A => let (x, a') := runState sax a in
                 runNatTrans unit {| runState := fun _ : A => (tt, a') |} >> 
@@ -86,7 +87,7 @@ Proof.
       simpl.
       destruct (runState sax x).
       unwrap_layer.
-      now rewrite H0. }
+      now rewrite H1. }
     rewrite G.
     assert (G1 : runNatTrans A {| runState := fun s : A => (s, s) |} >>=
                  (fun a : A => let (x, a') := runState sax a in
@@ -122,8 +123,8 @@ Proof.
   intros.
   unfold lensAlg_2_lensAlg'.
   unfold monad_morphism.
-  destruct H0.
   destruct H1.
+  destruct H2.
   split; intros; simpl.
 
   - (* maps ret to ret *)
@@ -152,32 +153,32 @@ Lemma lensAlg'_induces_lensAlg :
 Proof.
   intros.
   unfold lensAlg'_2_lensAlg.
-  destruct H0.
   destruct H1.
+  destruct H2.
   split; simpl; intros.
 
   - (* get_get *)
-    symmetry in H0.
+    symmetry in H1.
     rewrite (monadic_extensionality_2
                _
                (fun pair => runNatTrans ln' (ret pair))
-               (fun a b => H0 _ (a, b))).
-    symmetry in H1.
-    rewrite (monadic_extensionality_1 _ _ (fun _ => H1 _ _ _ _)).
-    rewrite H1.
-    rewrite (monadic_extensionality_1 _ _ (fun _ => H0 _ _)).
-    now rewrite H1.
+               (fun a b => H1 _ (a, b))).
+    symmetry in H2.
+    rewrite (monadic_extensionality_1 _ _ (fun _ => H2 _ _ _ _)).
+    rewrite H2.
+    rewrite (monadic_extensionality_1 _ _ (fun _ => H1 _ _)).
+    now rewrite H2.
 
   - (* get_put *)
-    rewrite <- H1.
-    now rewrite <- H0.
+    rewrite <- H2.
+    now rewrite <- H1.
 
   - (* put_get *)
-    rewrite <- H0.
-    now repeat rewrite <- H1.
+    rewrite <- H1.
+    now repeat rewrite <- H2.
 
   - (* put_put *)
-    now rewrite <- H1.
+    now rewrite <- H2.
 Qed.
 
 Definition zipAddrLn' {p} `{Monad p}
@@ -209,8 +210,8 @@ Lemma closed_under_composeLnAlgHom :
 Proof.
   unfold monad_morphism.
   intros.
-  destruct H4 as [QP1 QP2].
-  destruct H5 as [RQ1 RQ2].
+  destruct H7 as [QP1 QP2].
+  destruct H8 as [RQ1 RQ2].
   split; intros; simpl; [rewrite RQ1 | rewrite RQ2]; auto.
 Qed.
 
@@ -230,8 +231,8 @@ Proof.
   unfold monad_morphism.
   unfold lensAlgHom_2_lensAlg.
   intros.
-  destruct H2 as [GG GP PG PP].
-  destruct H3 as [QP1 QP2].
+  destruct H4 as [GG GP PG PP].
+  destruct H5 as [QP1 QP2].
   split; simpl; intros.
 
   - (* get_get *)
@@ -287,25 +288,26 @@ Record Address (p : Type -> Type) `{Monad p} := mkAddress
 { zip  : lensAlg' p nat
 ; city : lensAlg' p string
 }.
-Arguments mkAddress [p _].
-Arguments zip [p _].
-Arguments city [p _].
+Arguments mkAddress [p _ _].
+Arguments zip [p _ _].
+Arguments city [p _ _].
 
 Record Person (p : Type -> Type) `{Monad p} := mkPerson
 { name : lensAlg' p string
 ; q : Type -> Type
 ; A : Type
+; F : Functor q
 ; M : Monad q
 ; MS : MonadState A q
 ; address_ev : Address q
 ; addressLn : lensAlgHom p q A
 }.
-Arguments mkPerson [p _].
-Arguments name [p _].
-Arguments q [p _].
-Arguments A [p _].
-Arguments addressLn [p _].
-Arguments address_ev [p _].
+Arguments mkPerson [p _ _].
+Arguments name [p _ _].
+Arguments q [p _ _].
+Arguments A [p _ _].
+Arguments addressLn [p _ _].
+Arguments address_ev [p _ _].
 
 (* business logic *)
 
@@ -340,7 +342,7 @@ Definition Address_immutable :=
 Definition Person_immutable :=
   mkPerson (lens_2_lens' Background.name)
            (state address)
-            address _ _
+            address _ _ _
             Address_immutable
            (lens_2_lens' Background.addr).
 

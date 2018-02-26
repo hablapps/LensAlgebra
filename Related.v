@@ -1,3 +1,5 @@
+Require Import Program.Basics.
+Require Import FunctionalExtensionality.
 Require Import Background.
 Require Import Towards.
 
@@ -6,8 +8,41 @@ Require Import Towards.
 
 Record stateT (S : Type) (m : Type -> Type) `{Monad m} (A : Type) := mkStateT
 { runStateT : S -> m (A * S)%type }.
-Arguments mkStateT [S m _ A].
-Arguments runStateT [S m _ A].
+Arguments mkStateT [S m _ _ A].
+Arguments runStateT [S m _ _ A].
+
+Instance Functor_stateT (S : Type) (m : Type -> Type) 
+                       `{Monad m} : Functor (stateT S m) :=
+{ fmap _ _ f sa := mkStateT (fun s => 
+    fmap (fun pair => (f (fst pair), snd pair)) (runStateT sa s))
+}.
+
+Instance FunctorLaws_stateT (S : Type) (m : Type -> Type)
+                            {f : Functor m}
+                            {fl : @FunctorLaws m f}
+                            {M : @Monad m f} : FunctorLaws (stateT S m).
+Proof.
+  destruct fl.
+  constructor; simpl; intros.
+
+  - destruct fa.
+    simpl.
+    unwrap_layer.
+    assert (G : (fun pair : A * S => (id (fst pair), snd pair)) = id).
+    { apply functional_extensionality. intros. now destruct x0. }
+    rewrite G.
+    auto.
+
+  - unfold Basics.compose.
+    unwrap_layer.
+    simpl.
+    assert (G : (fun pair : A * S => (g (h (fst pair)), snd pair)) =
+                ((fun pair => (g (fst pair), snd pair)) ∘ (fun pair => (h (fst pair), snd pair)))).
+    { auto. }
+    rewrite G.
+    rewrite <- functor_comp.
+    auto.
+Qed.
 
 Instance Monad_stateT (S : Type) (m : Type -> Type) 
                      `{Monad m} : Monad (stateT S m) :=
@@ -19,8 +54,8 @@ Instance Monad_stateT (S : Type) (m : Type -> Type)
 Instance MonadLaws_stateT (S : Type) (m : Type -> Type) 
                          `{MonadLaws m} : MonadLaws (stateT S m).
 Proof.
-  destruct H0.
-  constructor; simpl; intros.
+  destruct H1.
+  constructor; simpl; intros; try unwrap_layer; auto.
   
   - (* left id *)
     rewrite (functional_extensionality_1
@@ -28,7 +63,7 @@ Proof.
       (runStateT (f a))
       (fun s => left_id _ _ _ _)).
     destruct (f a).
-    now unwrap_layer.
+    auto.
 
   - (* right id *)
     destruct ma.
@@ -38,10 +73,10 @@ Proof.
     { now destruct p. }
     rewrite (monadic_extensionality_1 
       (fun p => ret (fst p, snd p)) _ (fun _ => G _ _ _)).
-    now rewrite right_id.
+    auto.
 
-  - (* assoc *)
-    unwrap_layer.
+  - (* functor_rel *)
+    rewrite functor_rel.
     auto.
 Qed.
 
@@ -54,7 +89,7 @@ Instance MonadState_stateT (S : Type) (m : Type -> Type)
 Instance MonadStateLaws_stateT (S : Type) (m : Type -> Type)
                               `{MonadLaws m} : MonadStateLaws S (stateT S m).
 Proof.
-  destruct H0.
+  destruct H1.
   constructor; simpl; intros.
  
   - (* get_get *)
@@ -79,9 +114,9 @@ Record mLens (S A : Type) (m : Type -> Type) `{Monad m} := mkMLens
 { mview : S -> A
 ; mupdate : S -> A -> m S
 }.
-Arguments mview [S A m _].
-Arguments mupdate [S A m _].
-Arguments mkMLens [S A m _].
+Arguments mview [S A m _ _].
+Arguments mupdate [S A m _ _].
+Arguments mkMLens [S A m _ _].
 
 Record mLensLaws {S A m} `{Monad m} (mln : mLens S A m) := mkMLensLaws
 { mview_mupdate : forall s, mupdate mln s (mview mln s) = ret s
@@ -97,22 +132,26 @@ Record mLensLaws {S A m} `{Monad m} (mln : mLens S A m) := mkMLensLaws
 
 (* Connection between lens algebras and monadic lenses *)
 
-(* XXX: consider adding `Functor` to implement `update` *)
 Definition mLens_2_lensAlgStateT {S A m} `{Monad m}
                                  (mln : mLens S A m) : lensAlg (stateT S m) A :=
 {| view      := mkStateT (fun s => ret (mview mln s, s))
-;  update a' := mkStateT (fun s => mupdate mln s a' >>= (fun s' => ret (tt, s')))
+;  update a' := mkStateT (fun s => fmap (fun s' => (tt, s')) (mupdate mln s a'))
 |}.
 
 Theorem mLens_induces_lensAlgStateT : 
-    forall {S A m} `{MonadLaws m}
+    forall {S A m}
+           {f : Functor m}
+           {fl : @FunctorLaws m f}
+           {M : @Monad m f}
+           {ml : @MonadLaws m f M}
            (mln : mLens S A m),
            mLensLaws mln ->
            lensAlgLaws (mLens_2_lensAlgStateT mln).
 Proof.
   intros.
-  destruct H0.
-  destruct H1.
+  destruct fl.
+  destruct ml.
+  destruct H.
   constructor; simpl; intros; unwrap_layer.
 
   - (* get_get *)
@@ -122,24 +161,39 @@ Proof.
     rewrite left_id.
     simpl.
     rewrite mview_mupdate0.
+    rewrite functor_rel.
     now rewrite left_id.
 
   - (* put_get *)
     repeat rewrite assoc.
-    rewrite (monadic_extensionality_1
-      (fun s => ret (tt, s) >>= (fun p : unit * S => ret (mview mln (snd p), snd p)))
-      (fun s => ret (mview mln s, s))
-      (fun _ => left_id _ _ _ _)).
+    rewrite <- (functor_rel _ _ 
+                  (fmap (fun s' : S => (tt, s')) (mupdate mln x s)) 
+                  (fun pair => (mview mln (snd pair), snd pair))).
+    unfold compose in *.
+    rewrite (functor_comp _ _ _
+               (fun s' : S => (tt, s'))
+               (fun pair : unit * S => (mview mln (snd pair), snd pair))
+               (mupdate mln x s)).
+    simpl.
+    repeat rewrite functor_rel.
     rewrite (mupdate_mview0 _ (fun s a => ret (a, s)) _ _).
+    rewrite assoc.
     unwrap_layer.
     now rewrite left_id.
 
   - (* put_put *)
+    repeat rewrite functor_rel.
+    unfold compose.
     rewrite assoc.
     rewrite (monadic_extensionality_1
-      (fun s => ret (tt, s) >>= (fun p => mupdate mln (snd p) s2 >>= (fun s' => ret (tt, s'))))
-      (fun s => mupdate mln s s2 >>= (fun s' => ret (tt, s')))
+      (fun s => ret (tt, s) >>= (fun p => fmap (fun s' : S => (tt, s')) (mupdate mln (snd p) s2)))
+      _
       (fun _ => left_id _ _ _ _)).
+    rewrite (monadic_extensionality_1
+      (fun s : S => fmap (fun s' : S => (tt, s')) (mupdate mln s s2))
+      _
+      (fun _ => functor_rel _ _ _ _)).
+    unfold compose.
     rewrite <- assoc.
     now rewrite mupdate_mupdate0.
 Qed.
@@ -165,4 +219,4 @@ Definition mLens_2_bx {S A m} `{Monad m} (mln : mLens S A m) : BX (stateT S m) S
   mkBX (mkStateT (fun s => ret (s, s)))
        (mkStateT (fun s => ret (mview mln s, s)))
        (fun s' => mkStateT (fun _ => ret (tt, s')))
-       (fun a' => mkStateT (fun s => mupdate mln s a' >>= (fun s' => ret (tt, s')))). 
+       (fun a' => mkStateT (fun s => mupdate mln s a' >>= (fun s' => ret (tt, s')))).

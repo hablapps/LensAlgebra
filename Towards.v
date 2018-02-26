@@ -30,7 +30,7 @@ Theorem ms_iso_lens : forall {S A}
                              (ln : lens S A)
                              (ms : MonadState A (state S)),
     lensLaws ln ->
-    @MonadStateLaws _ _ _ ms ->
+    @MonadStateLaws _ _ _ _ ms ->
     ((ms_2_lens ∘ lens_2_ms) ln = ln) /\ 
     ((lens_2_ms ∘ ms_2_lens) ms = ms).
 Proof.
@@ -74,7 +74,7 @@ Qed.
 
 Lemma MonadState_state_s_induces_lens : 
     forall {S A : Type} (ms : MonadState A (state S)),
-           @MonadStateLaws A (state S) _ ms -> lensLaws (ms_2_lens ms).
+           @MonadStateLaws A (state S) _ _ ms -> lensLaws (ms_2_lens ms).
 Proof.
   intros.
   unfold ms_2_lens.
@@ -103,7 +103,7 @@ Qed.
 
 Lemma lens_induces_MonadState_state_s :
     forall {S A : Type} (ln : lens S A),
-           lensLaws ln -> @MonadStateLaws A (state S) _ (lens_2_ms ln).
+           lensLaws ln -> @MonadStateLaws A (state S) _ _ (lens_2_ms ln).
 Proof.
   intros.
   destruct H.
@@ -123,9 +123,9 @@ Record lensAlg (p : Type -> Type) (A : Type) `{M : Monad p} : Type :=
 ; update : A -> p unit
 ; modify (f : A -> A) : p unit := view >>= (update ∘ f)
 }.
-Arguments view [p A _].
-Arguments update [p A _].
-Arguments modify [p A _].
+Arguments view [p A _ _].
+Arguments update [p A _ _].
+Arguments modify [p A _ _].
 Notation "ln ~ f" := (modify ln f) (at level 40, no associativity).
 
 Record lensAlgLaws {p A} `{Monad p} (ln : lensAlg p A) : Type :=
@@ -171,7 +171,7 @@ Lemma non_eff_view :
     view ln >> k = k.
 Proof.
   intros.
-  pose proof (@general_viewview p A X H ml ln lnl) as J.
+  pose proof (@general_viewview p A X H _ ml ln lnl) as J.
   destruct ml.
   destruct lnl.
   rewrite <- (left_id unit _ tt (fun _ => k)).
@@ -187,8 +187,8 @@ Record Address (p : Type -> Type) `{Monad p} := mkAddress
 { zip  : lensAlg p nat
 ; city : lensAlg p string
 }.
-Arguments zip [p _].
-Arguments city [p _].
+Arguments zip [p _ _].
+Arguments city [p _ _].
 
 Definition modifyZip (f : nat -> nat) 
                      {p} `{Monad p} (data : Address p) : p unit :=

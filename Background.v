@@ -9,22 +9,38 @@ Open Scope program_scope.
 (* Typeclasses *)
 (***************)
 
+(* Functor *)
+
+Class Functor (f : Type -> Type) : Type :=
+{ fmap {A B : Type} (g : A -> B) : f A -> f B }. 
+
+Class FunctorLaws (f : Type -> Type) `{Functor f} :=
+{ functor_id   : forall A (fa : f A), fmap id fa = fa
+; functor_comp : forall A B C (h : A -> B) (g : B -> C) (fa : f A),
+                        (fmap g ∘ fmap h) fa = fmap (g ∘ h) fa
+}.
+
 (* Natural Transformation *)
 
-Class natTrans (f g : Type -> Type) : Type := mkNatTrans
-{ runNatTrans {X} : f X -> g X }.
-Arguments mkNatTrans [f g].
-Arguments runNatTrans [f g] _ [X].
+Class natTrans (f g : Type -> Type) `{Functor f, Functor g} : Type := mkNatTrans
+{ runNatTrans : forall X, f X -> g X }.
+Arguments mkNatTrans [f g _ _].
+Arguments runNatTrans [f g _ _] _ [X].
 Notation "f ~> g" := (natTrans f g) (at level 50, left associativity).
 
-Definition composeNT {f g h : Type -> Type} 
+Class natTransLaws (f g : Type -> Type) `{Functor f, Functor g} (φ : f ~> g) :=
+{ natTrans_comm : forall A B (fa : f A) (g : A -> B), 
+                         runNatTrans φ (fmap g fa) = fmap g (runNatTrans φ fa)
+}.
+
+Definition composeNT {f g h : Type -> Type} `{Functor f, Functor g, Functor h}
                      (nt1 : g ~> h) (nt2 : f ~> g) : f ~> h :=
   mkNatTrans (fun _ fx => runNatTrans nt1 (runNatTrans nt2 fx)).
 Notation "f • g" := (composeNT f g) (at level 40, left associativity).
 
 (* Monad *)
 
-Class Monad (m : Type -> Type) : Type :=
+Class Monad (m : Type -> Type) `{Functor m} : Type :=
 { ret : forall {X}, X -> m X
 ; bind : forall {A B}, m A -> (A -> m B) -> m B
 }.
@@ -36,6 +52,7 @@ Class MonadLaws (m : Type -> Type) `{Monad m} :=
 ; right_id : forall {A} (ma : m A), ma >>= ret = ma
 ; assoc : forall {A B C} (ma : m A) (f : A -> m B) (g : B -> m C),
                  ma >>= f >>= g = ma >>= (fun x => f x >>= g)
+; functor_rel : forall {A B} (ma : m A) (f : A -> B), fmap f ma = ma >>= ret ∘ f
 }.
 
 Definition monad_morphism {f g : Type -> Type} 
@@ -51,7 +68,7 @@ Lemma reta_gtgt_retb_is_retb :
     (forall A B (a : A) (b : B), ret a >> ret b = ret b).
 Proof.
   intros.
-  destruct H0.
+  destruct H1.
   apply left_id0.
 Qed.
 
@@ -141,13 +158,13 @@ Qed.
 Lemma non_eff_get : 
     forall  {m : Type -> Type} {A : Type}
            `{M : Monad m}
-            {ML : @MonadLaws m M}
-            {MS : @MonadState A m M}
-            {MSL : @MonadStateLaws A m M MS} {X : Type} (p : m X),
+            {ML : @MonadLaws m _ M}
+            {MS : @MonadState A m _ M}
+            {MSL : @MonadStateLaws A m _ M MS} {X : Type} (p : m X),
     get >> p = p.
 Proof.
   intros.
-  pose proof (@general_getget m A M MS MSL ML) as J.
+  pose proof (@general_getget m A _ M MS MSL ML) as J.
   destruct ML.
   destruct MSL.
   rewrite <- (left_id0 unit _ tt (fun _ => p)).
@@ -184,6 +201,15 @@ Ltac state_reason :=
   end; simpl; auto.
 
 Ltac i_state_reason := intros; repeat state_reason.
+
+Instance Functor_state {S : Type} : Functor (state S) :=
+{ fmap _ _ f sa := mkState (fun s => let (a, s') := runState sa s in (f a, s'))
+}.
+
+Instance Functor_laws {S : Type} : FunctorLaws (state S).
+Proof.
+  constructor; unfold fmap; unfold compose; simpl; i_state_reason.
+Qed.
 
 Instance Monad_state {S : Type} : Monad (state S) :=
 { ret := fun X x => mkState (fun s => (x, s))
@@ -238,7 +264,7 @@ Proof. i_state_reason. Qed.
 Lemma get_leaves_s_as_is : 
     forall {S A}
            {ms : MonadState A (state S)} 
-           {msl : @MonadStateLaws A (state S) _ ms} (s : S),
+           {msl : @MonadStateLaws A (state S) _ _ ms} (s : S),
            execState get s = s.
 Proof.
   intros.
