@@ -199,6 +199,9 @@ Definition composeLnAlgHom {p q r A B}
   φ • ψ.
 Notation "f ▷ g" := (composeLnAlgHom f g) (at level 40, left associativity).
 
+Definition identityLensAlgHom p A `{MonadState A p} : lensAlgHom p p A :=
+  mkNatTrans (fun X p => p).
+
 Lemma closed_under_composeLnAlgHom :
     forall  {p q r A B}
            `{MonadState B r} `{MonadState A q} `{Monad p}
@@ -213,6 +216,49 @@ Proof.
   destruct H7 as [QP1 QP2].
   destruct H8 as [RQ1 RQ2].
   split; intros; simpl; [rewrite RQ1 | rewrite RQ2]; auto.
+Qed.
+
+Lemma left_id_law_composeLnAlgHom :
+    forall  {p q A B}
+           `{MonadState A q} (* weird => *) `{MonadState B p}
+            (φ : lensAlgHom p q A),
+            identityLensAlgHom p B • φ = φ.
+Proof.
+  intros.
+  unfold composeNT.
+  destruct φ.
+  apply f_equal.
+  extensionality X.
+  now extensionality fx.
+Qed.
+
+Lemma right_id_law_composeLnAlgHom :
+    forall  {p q A}
+           `{MonadState A q} `{Monad p}
+            (φ : lensAlgHom p q A),
+            (φ • identityLensAlgHom q A) = φ.
+Proof.
+  intros.
+  unfold composeNT.
+  destruct φ.
+  apply f_equal.
+  extensionality X.
+  now extensionality fx.
+Qed.
+
+Lemma assoc_composeLnAlgHom :
+    forall  {p q r s A B C}
+           `{MonadState C s} `{MonadState B r} `{MonadState A q} `{Monad p}
+            (φ : lensAlgHom p q A)
+            (ψ : lensAlgHom q r B)
+            (χ : lensAlgHom r s C),
+            (φ • ψ) • χ = φ • (ψ • χ).
+Proof.
+  intros.
+  unfold composeNT.
+  apply f_equal.
+  extensionality X.
+  now extensionality fx.
 Qed.
 
 Definition lensAlgHom_2_lensAlg {p q A} `{Monad p} `{MonadState A q}
