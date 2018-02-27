@@ -200,7 +200,7 @@ Definition composeLnAlgHom {p q r A B}
 Notation "f ▷ g" := (composeLnAlgHom f g) (at level 40, left associativity).
 
 Definition identityLensAlgHom p A `{MonadState A p} : lensAlgHom p p A :=
-  mkNatTrans (fun X p => p).
+  mkNatTrans (fun _ => id).
 
 Lemma closed_under_composeLnAlgHom :
     forall  {p q r A B}
@@ -260,6 +260,12 @@ Proof.
   extensionality X.
   now extensionality fx.
 Qed.
+
+Definition zipAddrLn'' {p q r} 
+                      `{Monad p} `{MonadState address q} `{MonadState nat r}
+                       (addressLn : lensAlgHom p q address)
+                       (zipLn : lensAlgHom q r nat) : lensAlgHom p r nat :=
+  addressLn ▷ zipLn.
 
 Definition lensAlgHom_2_lensAlg {p q A} `{Monad p} `{MonadState A q}
                                 (φ : lensAlgHom p q A) : lensAlg p A :=
@@ -339,55 +345,45 @@ Definition modifyZip {p q r A} `{Monad p, MonadState A q, MonadState nat r}
 (* data layer *)
 
 Record Address (p : Type -> Type) `{Monad p} := mkAddress
-{ zip  : lensAlg' p nat
-; city : lensAlg' p string
+{ zipLn  : lensAlg' p nat
+; cityLn : lensAlg' p string
 }.
 Arguments mkAddress [p _ _].
-Arguments zip [p _ _].
-Arguments city [p _ _].
+Arguments zipLn [p _ _].
+Arguments cityLn [p _ _].
 
 Record Person (p : Type -> Type) `{Monad p} := mkPerson
-{ name : lensAlg' p string
+{ nameLn : lensAlg' p string
 ; q : Type -> Type
 ; A : Type
 ; F : Functor q
 ; M : Monad q
 ; MS : MonadState A q
 ; address_ev : Address q
-; address : lensAlgHom p q A
+; addressLn : lensAlgHom p q A
 }.
 Arguments mkPerson [p _ _].
-Arguments name [p _ _].
+Arguments nameLn [p _ _].
 Arguments q [p _ _].
 Arguments A [p _ _].
-Arguments address [p _ _].
-Arguments address_ev [p _ _].
+Arguments addressLn [p _ _].
+Arguments address_ev [p _ _ _].
 
 (* business logic *)
-
-Definition zipLn {p} `{Monad p}
-                 {data : Person p} : lensAlg' (q data) nat :=
-  zip (address_ev data).
-
-Definition cityLn {p} `{Monad p}
-                  {data : Person p} : lensAlg' (q data) string :=
-  city (address_ev data).
 
 Definition modifyZip'' {p} `{Monad p}
                            (f : nat -> nat)
                            (data : Person p) : p unit :=
-  let addressLn := address data in
-  let zipLn     := zip (address_ev data) in
-  (addressLn ▷ zipLn) ~ f.
+  (addressLn data ▷ zipLn address_ev) ~ f.
 
 Definition viewPersonCity {p} `{Monad p}
                           (data : Person p) : p string :=
-  view (address data ▷ cityLn).
+  view (addressLn data ▷ cityLn address_ev).
 
 Definition updateName {p} `{Monad p}
                            (s : string)
                            (data : Person p) : p unit :=
-  update (name data) s.
+  update (nameLn data) s.
 
 (* instantiation *)
 
