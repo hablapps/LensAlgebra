@@ -19,10 +19,10 @@ Definition zipAddrLn {p q}
 
 (* Alternative lens algebra (or MonadState) definition *)
 
-Definition lensAlg' (p : Type -> Type) (A : Type) :=
+Definition lensAlg' (p : Type -> Type) `{Monad p} (A : Type) :=
   state A ~> p.
 
-Definition lensAlg'_2_lensAlg {p A} `{Monad p} 
+Definition lensAlg'_2_lensAlg {p A} `{Monad p}
                               (ln' : lensAlg' p A) : lensAlg p A :=
 {| view := runNatTrans ln' get
 ;  update a := runNatTrans ln' (put a)
@@ -33,9 +33,9 @@ Definition lensAlg_2_lensAlg' {p A} `{Monad p}
   mkNatTrans (fun X sax => view ln >>= (fun a => let (x, a') := runState sax a
                                                  in update ln a' >> ret x)).
 
-Lemma lensAlg_iso_lensAlg' : 
+Theorem lensAlg_iso_lensAlg' :
     forall {p A} `{MonadLaws p} (ln : lensAlg p A) (ln' : lensAlg' p A),
-           lensAlgLaws ln -> 
+           lensAlgLaws ln ->
            monad_morphism ln' ->
            ((lensAlg'_2_lensAlg ∘ lensAlg_2_lensAlg') ln = ln) /\
            ((lensAlg_2_lensAlg' ∘ lensAlg'_2_lensAlg) ln' = ln').
@@ -44,12 +44,12 @@ Proof.
   unfold lensAlg'_2_lensAlg.
   unfold lensAlg_2_lensAlg'.
   unfold compose.
-  pose proof (@non_eff_view p A H H0 ln H1) as K.
-  destruct H0.
+  pose proof (@non_eff_view p A H H0 H1 ln) as K.
+  destruct H1.
   split; simpl.
 
   - (* lensAlg'_2_lensAlg ∘ lensAlg_2_lensAlg' *)
-    destruct H1.
+    destruct H2.
     rewrite <- (monadic_extensionality_1 _ _ update_view).
     rewrite <- assoc.
     rewrite view_update.
@@ -74,27 +74,28 @@ Proof.
     apply f_equal.
     extensionality X.
     extensionality sax.
+    destruct H3; simpl in *.
     assert (G : runNatTrans A {| runState := fun s : A => (s, s) |} >>=
                 (fun a : A => let (x, a') := runState sax a in
-                runNatTrans unit {| runState := fun _ : A => (tt, a') |} >> 
+                runNatTrans unit {| runState := fun _ : A => (tt, a') |} >>
                 ret x) =
                 runNatTrans A {| runState := fun s : A => (s, s) |} >>=
                 (fun a : A => let (x, a') := runState sax a in
-                runNatTrans unit {| runState := fun _ : A => (tt, a') |} >> 
+                runNatTrans unit {| runState := fun _ : A => (tt, a') |} >>
                 runNatTrans X (ret x))).
-    { unwrap_layer. 
+    { unwrap_layer.
       simpl.
       destruct (runState sax x).
       unwrap_layer.
-      now rewrite H0. }
+      now rewrite H1. }
     rewrite G.
     assert (G1 : runNatTrans A {| runState := fun s : A => (s, s) |} >>=
                  (fun a : A => let (x, a') := runState sax a in
-                 runNatTrans unit {| runState := fun _ : A => (tt, a') |} >> 
+                 runNatTrans unit {| runState := fun _ : A => (tt, a') |} >>
                  runNatTrans X (ret x)) =
                  runNatTrans A {| runState := fun s : A => (s, s) |} >>=
                  (fun a : A =>
-                 runNatTrans unit {| runState := fun _ : A => (tt, execState sax a) |} >> 
+                 runNatTrans unit {| runState := fun _ : A => (tt, execState sax a) |} >>
                  runNatTrans X (ret (evalState sax a)))).
     { unwrap_layer.
       unfold evalState.
@@ -115,15 +116,15 @@ Proof.
     now destruct (runState x).
 Qed.
 
-Lemma lensAlg_induces_lensAlg' : 
+Lemma lensAlg_induces_lensAlg' :
     forall {p A} `{MonadLaws p} (ln : lensAlg p A),
            lensAlgLaws ln -> monad_morphism (lensAlg_2_lensAlg' ln).
 Proof.
   intros.
   unfold lensAlg_2_lensAlg'.
   unfold monad_morphism.
-  destruct H0.
   destruct H1.
+  destruct H2.
   split; intros; simpl.
 
   - (* maps ret to ret *)
@@ -146,38 +147,38 @@ Proof.
     now rewrite update_update.
 Qed.
 
-Lemma lensAlg'_induces_lensAlg : 
+Lemma lensAlg'_induces_lensAlg :
     forall {p A} `{MonadLaws p} (ln' : lensAlg' p A),
            monad_morphism ln' -> lensAlgLaws (lensAlg'_2_lensAlg ln').
 Proof.
   intros.
   unfold lensAlg'_2_lensAlg.
-  destruct H0.
   destruct H1.
+  destruct H2.
   split; simpl; intros.
 
   - (* get_get *)
-    symmetry in H0.
+    symmetry in H1.
     rewrite (monadic_extensionality_2
                _
                (fun pair => runNatTrans ln' (ret pair))
-               (fun a b => H0 _ (a, b))).
-    symmetry in H1.
-    rewrite (monadic_extensionality_1 _ _ (fun _ => H1 _ _ _ _)).
-    rewrite H1.
-    rewrite (monadic_extensionality_1 _ _ (fun _ => H0 _ _)).
-    now rewrite H1.
+               (fun a b => H1 _ (a, b))).
+    symmetry in H2.
+    rewrite (monadic_extensionality_1 _ _ (fun _ => H2 _ _ _ _)).
+    rewrite H2.
+    rewrite (monadic_extensionality_1 _ _ (fun _ => H1 _ _)).
+    now rewrite H2.
 
   - (* get_put *)
-    rewrite <- H1.
-    now rewrite <- H0.
+    rewrite <- H2.
+    now rewrite <- H1.
 
   - (* put_get *)
-    rewrite <- H0.
-    now repeat rewrite <- H1.
+    rewrite <- H1.
+    now repeat rewrite <- H2.
 
   - (* put_put *)
-    now rewrite <- H1.
+    now rewrite <- H2.
 Qed.
 
 Definition zipAddrLn' {p} `{Monad p}
@@ -188,17 +189,17 @@ Definition zipAddrLn' {p} `{Monad p}
 
 (* Lens algebra homomorphism *)
 
-Definition lensAlgHom (p q : Type -> Type) (A : Type) 
+Definition lensAlgHom (p q : Type -> Type) (A : Type)
                      `{Monad p} `{MonadState A q} :=
   q ~> p.
 
 Definition composeLnAlgHom {p q r A B}
    `{MonadState B r} `{MonadState A q} `{Monad p}
-    (φ : lensAlgHom p q A) (ψ : lensAlgHom q r B) : lensAlgHom p r B := 
+    (φ : lensAlgHom p q A) (ψ : lensAlgHom q r B) : lensAlgHom p r B :=
   φ • ψ.
 Notation "f ▷ g" := (composeLnAlgHom f g) (at level 40, left associativity).
 
-Theorem closed_under_composeLnAlgHom : 
+Lemma closed_under_composeLnAlgHom :
     forall  {p q r A B}
            `{MonadState B r} `{MonadState A q} `{Monad p}
             (φ : lensAlgHom p q A)
@@ -209,36 +210,36 @@ Theorem closed_under_composeLnAlgHom :
 Proof.
   unfold monad_morphism.
   intros.
-  destruct H4 as [QP1 QP2].
-  destruct H5 as [RQ1 RQ2].
+  destruct H7 as [QP1 QP2].
+  destruct H8 as [RQ1 RQ2].
   split; intros; simpl; [rewrite RQ1 | rewrite RQ2]; auto.
 Qed.
 
-Definition lensAlgHom_2_lensAlg {p q A} `{Monad p} `{MonadState A q} 
+Definition lensAlgHom_2_lensAlg {p q A} `{Monad p} `{MonadState A q}
                                 (φ : lensAlgHom p q A) : lensAlg p A :=
 {| view := runNatTrans φ get
 ;  update a := runNatTrans φ (put a)
 |}.
 
-Theorem lensAlgHom_induces_lensAlg :
-    forall {p q A} 
+Lemma lensAlgHom_induces_lensAlg :
+    forall {p q A}
           `{Monad p} `{MonadStateLaws A q}
            (φ : lensAlgHom p q A),
-           monad_morphism φ -> 
+           monad_morphism φ ->
            lensAlgLaws (lensAlgHom_2_lensAlg φ).
 Proof.
   unfold monad_morphism.
   unfold lensAlgHom_2_lensAlg.
   intros.
-  destruct H2 as [GG GP PG PP].
-  destruct H3 as [QP1 QP2].
+  destruct H4 as [GG GP PG PP].
+  destruct H5 as [QP1 QP2].
   split; simpl; intros.
 
   - (* get_get *)
     symmetry in QP1.
-    rewrite (monadic_extensionality_2 
+    rewrite (monadic_extensionality_2
                _
-               (fun pair => runNatTrans φ (ret pair)) 
+               (fun pair => runNatTrans φ (ret pair))
                (fun a1 a2 => QP1 _ (a1, a2))).
     symmetry in QP2.
     rewrite (monadic_extensionality_1 _ _ (fun _ => QP2 _ _ _ _)).
@@ -263,16 +264,16 @@ Proof.
     now rewrite PP.
 Qed.
 
-Definition view {p q A} `{Monad p} `{MonadState A q} 
+Definition view {p q A} `{Monad p} `{MonadState A q}
                 (φ : lensAlgHom p q A) : p A :=
   view (lensAlgHom_2_lensAlg φ).
 
-Definition update {p q A} `{Monad p} `{MonadState A q} 
+Definition update {p q A} `{Monad p} `{MonadState A q}
                   (φ : lensAlgHom p q A)
                   (a : A) : p unit :=
   update (lensAlgHom_2_lensAlg φ) a.
 
-Definition modify {p q A} `{Monad p} `{MonadState A q} 
+Definition modify {p q A} `{Monad p} `{MonadState A q}
                   (φ : lensAlgHom p q A)
                   (f : A -> A) : p unit :=
   modify (lensAlgHom_2_lensAlg φ) f.
@@ -295,25 +296,26 @@ Record Address (p : Type -> Type) `{Monad p} := mkAddress
 { zip  : lensAlg' p nat
 ; city : lensAlg' p string
 }.
-Arguments mkAddress [p _].
-Arguments zip [p _].
-Arguments city [p _].
+Arguments mkAddress [p _ _].
+Arguments zip [p _ _].
+Arguments city [p _ _].
 
 Record Person (p : Type -> Type) `{Monad p} := mkPerson
 { name : lensAlg' p string
 ; q : Type -> Type
 ; A : Type
+; F : Functor q
 ; M : Monad q
 ; MS : MonadState A q
 ; address_ev : Address q
 ; address : lensAlgHom p q A
 }.
-Arguments mkPerson [p _].
-Arguments name [p _].
-Arguments q [p _].
-Arguments A [p _].
-Arguments address [p _].
-Arguments address_ev [p _].
+Arguments mkPerson [p _ _].
+Arguments name [p _ _].
+Arguments q [p _ _].
+Arguments A [p _ _].
+Arguments address [p _ _].
+Arguments address_ev [p _ _].
 
 (* business logic *)
 
@@ -325,7 +327,7 @@ Definition cityLn {p} `{Monad p}
                   {data : Person p} : lensAlg' (q data) string :=
   city (address_ev data).
 
-Definition modifyZip {p} `{Monad p}
+Definition modifyZip'' {p} `{Monad p}
                            (f : nat -> nat)
                            (data : Person p) : p unit :=
   let addressLn := address data in
@@ -350,10 +352,10 @@ Definition Address_immutable :=
 Definition Person_immutable :=
   mkPerson (lens_2_lens' Background.name)
            (state Background.address)
-            _ _ _
+            _ _ _ _
             Address_immutable
            (lens_2_lens' Background.addr).
 
-Example modify_jesus : 
-  execState (modifyZip (fun z => z + 1) Person_immutable) jesus = jesus'.
+Example modify_jesus :
+  execState (modifyZip'' (fun z => z + 1) Person_immutable) jesus = jesus'.
 Proof. auto. Qed.
