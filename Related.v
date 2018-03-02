@@ -186,7 +186,8 @@ Proof.
     unfold compose.
     rewrite assoc.
     rewrite (monadic_extensionality_1
-      (fun s => ret (tt, s) >>= (fun p => fmap (fun s' : S => (tt, s')) (mupdate mln (snd p) s2)))
+      (fun s => ret (tt, s) >>= 
+                (fun p => fmap (fun s' : S => (tt, s')) (mupdate mln (snd p) s2)))
       _
       (fun _ => left_id _ _ _ _)).
     rewrite (monadic_extensionality_1
@@ -220,3 +221,118 @@ Definition mLens_2_bx {S A m} `{Monad m} (mln : mLens S A m) : BX (stateT S m) S
        (mkStateT (fun s => ret (mview mln s, s)))
        (fun s' => mkStateT (fun _ => ret (tt, s')))
        (fun a' => mkStateT (fun s => mupdate mln s a' >>= (fun s' => ret (tt, s')))).
+
+
+(* profunctor lenses *)
+
+Class Profunctor (p : Type -> Type -> Type) :=
+{ dimap : forall A A' B B', (A' -> A) -> (B -> B') -> p A B -> p A' B' }.
+Arguments dimap [p] [_] [_ _ _ _].
+
+Class ProfunctorLaws (p : Type -> Type -> Type) `{Profunctor p} :=
+{ profunctor_id : forall A B (h : p A B), dimap id id h = id h
+; profunctor_assoc : forall A A' A'' B B' B'' 
+                            (f : A'' -> A') (f' : A' -> A)
+                            (g : B' -> B'') (g' : B -> B'), 
+                            dimap (f' ∘ f) (g ∘ g') = dimap f g ∘ dimap f' g'
+}.
+
+Class Cartesian (p : Type -> Type -> Type) `{Profunctor p} :=
+{ first  : forall A B C, p A B -> p (A * C)%type (B * C)%type
+; second : forall A B C, p A B -> p (C * A)%type (C * B)%type
+}.
+Arguments first [p _] [_] [_ _ _].
+Arguments second [p _] [_] [_ _ _].
+
+Definition runit  {A} (a1 : A * unit) : A := fst a1.
+Definition runit' {A} (a : A) : A * unit := (a, tt).
+Definition assoc  {A B C} (a_bc : A * (B * C)) : (A * B) * C :=
+  match a_bc with | (a, (b, c)) => ((a, b), c) end.
+Definition assoc' {A B C} (ab_c : (A * B) * C) : A * (B * C) :=
+  match ab_c with | ((a, b), c) => (a, (b, c)) end.
+
+Class CartesianLaws (p : Type -> Type -> Type) `{Cartesian p} :=
+{ cartesian_id    : forall A B (h : p A B), 
+                           dimap runit runit' h = first h
+; cartesian_assoc : forall A B C (h : p A A),
+                           dimap (@assoc A B C) assoc' (first (first h)) = first h
+}.
+
+Record indexedStateT S1 S2 m A `{Monad m} := mkIndexedStateT
+{ runIndexedStateT : S1 -> m (A * S2)%type }.
+Arguments mkIndexedStateT [S1 S2 m A _ _].
+Arguments runIndexedStateT [S1 S2 m A _ _].
+
+Definition indexedStateT_X m `{Monad m} X : Type -> Type -> Type :=
+  fun S1 S2 => indexedStateT S1 S2 m X.
+
+Instance Profunctor_indexedStateT m `{Monad m} X : Profunctor (indexedStateT_X m X) :=
+{ dimap _ _ _ _ f g h := 
+    mkIndexedStateT (fun a' => 
+      fmap (fun pair => (fst pair, g (snd pair))) (runIndexedStateT h (f a')))
+}.
+
+Instance ProfunctorLaws_indexedStateT m 
+                                      {f : Functor m}
+                                      {fl : @FunctorLaws m f}
+                                      {M : @Monad m f}
+                                      {ml : @MonadLaws m f M}
+                                      X : ProfunctorLaws (indexedStateT_X m X).
+Proof.
+  destruct fl.
+  split; simpl; intros.
+  
+  - (* id *)
+    destruct h.
+    unfold id.
+    unwrap_layer.
+    simpl.
+    assert (H : (fun pair : X * B => (fst pair, snd pair)) = id).
+    { functional_extensionality_i. now destruct x0. }
+    rewrite H.
+    now rewrite functor_id. 
+
+  - (* assoc *)
+    unfold compose.
+    functional_extensionality_i.
+    unwrap_layer.
+    simpl.
+    unfold compose in functor_comp.
+    now rewrite functor_comp.
+Qed.
+
+Instance Cartesian_indexedStateT m `{Monad m} X : Cartesian (indexedStateT_X m X) :=
+{ first  _ _ _ h := 
+    mkIndexedStateT (fun pair => fmap (fun pair' => (fst pair', (snd pair', snd pair))) 
+                                      (runIndexedStateT h (fst pair)))
+; second _ _ _ h :=
+    mkIndexedStateT (fun pair => fmap (fun pair' => (fst pair', (fst pair, snd pair'))) 
+                                      (runIndexedStateT h (snd pair)))
+}.
+
+Instance CartesianLaws_indexedStateT m 
+                                     {f : Functor m}
+                                     {fl : @FunctorLaws m f}
+                                     {M : @Monad m f}
+                                     {ml : @MonadLaws m f M} X : CartesianLaws (indexedStateT_X m X).
+Proof.
+    split; simpl; intros.
+
+  - (* id *)
+    unwrap_layer.
+    destruct x.
+    now destruct u.
+
+  - (* assoc *)
+    unwrap_layer.
+    destruct x.
+    destruct p.
+    simpl.
+    destruct fl.
+    unfold compose in functor_comp.
+    now repeat rewrite functor_comp.
+Qed.
+
+Definition pLens S T A B := forall p `{Cartesian p}, p A B -> p S T.
+
+Definition lens'' S A := pLens S S A A.

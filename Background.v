@@ -22,13 +22,13 @@ Class FunctorLaws (f : Type -> Type) `{Functor f} :=
 
 (* Natural Transformation *)
 
-Class natTrans (f g : Type -> Type) `{Functor f, Functor g} : Type := mkNatTrans
+Class natTrans f g `{Functor f, Functor g} : Type := mkNatTrans
 { runNatTrans : forall X, f X -> g X }.
 Arguments mkNatTrans [f g _ _].
 Arguments runNatTrans [f g _ _] _ [X].
 Notation "f ~> g" := (natTrans f g) (at level 50, left associativity).
 
-Class natTransLaws (f g : Type -> Type) `{Functor f, Functor g} (φ : f ~> g) :=
+Class natTransLaws f g `{Functor f, Functor g} (φ : f ~> g) :=
 { natTrans_comm : forall A B (fa : f A) (g : A -> B),
                          runNatTrans φ (fmap g fa) = fmap g (runNatTrans φ fa)
 }.
@@ -178,15 +178,15 @@ Qed.
 (* State *)
 (*********)
 
-Record state (S A : Type) := mkState
-{ runState : S -> A * S }.
-Arguments mkState [S A].
-Arguments runState [S A].
+Record state (S Out : Type) := mkState
+{ runState : S -> Out * S }.
+Arguments mkState [S Out].
+Arguments runState [S Out].
 
-Definition evalState {S A} (st : state S A) (s : S) : A :=
+Definition evalState {S Out} (st : state S Out) (s : S) : Out :=
   fst (runState st s).
 
-Definition execState {S A} (st : state S A) (s : S) : S :=
+Definition execState {S Out} (st : state S Out) (s : S) : S :=
   snd (runState st s).
 
 Ltac state_reason :=
@@ -210,6 +210,10 @@ Instance Functor_laws {S : Type} : FunctorLaws (state S).
 Proof.
   constructor; unfold fmap; unfold compose; simpl; i_state_reason.
 Qed.
+
+Definition state_get {S} : state S S := mkState (fun s => (s, s)).
+
+Definition state_put {S} (s' : S) : state S unit := mkState (fun _ => (tt, s')).
 
 Instance Monad_state {S : Type} : Monad (state S) :=
 { ret := fun X x => mkState (fun s => (x, s))
@@ -366,29 +370,29 @@ Notation "ln ▶ pr" := (composeLnPr ln pr) (at level 40, left associativity).
 (* Lens composition example *)
 
 Record address : Type := mkAddress
-{ _city : string
-; _zip : nat
+{ city : string
+; zip : nat
 }.
 
 Record person : Type := mkPerson
-{ _name : string
-; _addr : address
+{ name : string
+; addr : address
 }.
 
-Definition city : lens address string :=
-  mkLens _city (fun a c' => mkAddress c' (_zip a)).
+Definition cityLn : lens address string :=
+  mkLens city (fun a c' => mkAddress c' (zip a)).
 
-Definition zip : lens address nat :=
-  mkLens _zip (fun a z' => mkAddress (_city a) z').
+Definition zipLn : lens address nat :=
+  mkLens zip (fun a z' => mkAddress (city a) z').
 
-Definition name : lens person string :=
- mkLens _name (fun p n' => mkPerson n' (_addr p)).
+Definition nameLn : lens person string :=
+ mkLens name (fun p n' => mkPerson n' (addr p)).
 
-Definition addr : lens person address :=
- mkLens _addr (fun p a' => mkPerson (_name p) a').
+Definition addrLn : lens person address :=
+ mkLens addr (fun p a' => mkPerson (name p) a').
 
 Definition modifyZip (f : nat -> nat) : person -> person :=
-  (addr ▷ zip) %~ f.
+  (addrLn ▷ zipLn) %~ f.
 
 Definition jesus := mkPerson "jesus" (mkAddress "mostoles" 289).
 
