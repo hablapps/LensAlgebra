@@ -5,51 +5,53 @@ Require Import Background.
 Open Scope program_scope.
 
 
-(******************)
-(* Optic approach *)
-(******************)
+(*****************)
+(* Lens approach *)
+(*****************)
+
+(* Here, we show the simplified version of the university example, which only
+   requires lenses (Sect. 3.1). The traversal-based example serves us as
+   motivation to introduce the rich set of optic abstractions, but doesn't add
+   value to the rest of the paper. *)
 
 (* Data layer *)
 
-Record address := mkAddress
-{ zip : nat
-; region : option string
+Record department := mkDepartment
+{ budget : nat }.
+
+Record university := mkUniversity
+{ name : string
+; mathDep : department
 }.
 
-Definition zipLn : lens address nat :=
-  mkLens zip (fun a z' => mkAddress z' (region a)).
+Definition budgetLn : lens department nat :=
+  mkLens budget (fun _ b' => mkDepartment b').
 
-Definition regionLn : lens address (option string) :=
-  mkLens region (mkAddress ∘ zip).
-
+Definition mathDepLn : lens university department :=
+  mkLens mathDep (fun u d' => mkUniversity (name u) d').
 
 (* Business logic *)
 
-Definition modifyZip (f : nat -> nat) : address -> address :=
-  zipLn %~ f.
+Definition duplicateDepBudget : department -> department :=
+  budgetLn %~ (fun b => b * 2).
 
-Definition modifyRegion (f : string -> string) : address -> address :=
-  (regionLn ▶ somePr) ?~ f.
+Definition duplicateUnivBudget : university -> university :=
+  mathDepLn %~ duplicateDepBudget.
+
+Definition duplicateUnivBudget' : university -> university :=
+  (mathDepLn ▷ budgetLn) %~ (fun b => b * 2).
 
 
-(**********************)
-(* Algebraic approach *)
-(**********************)
+(*******************************)
+(* Algebraic theories approach *)
+(*******************************)
 
-(* Ad hoc algebras *)
+(* Repository algebras *)
 
-Class Address (p : Type -> Type) `{Monad p} :=
-{ getZip : p nat
-; modZip (f : nat -> nat) : p unit
-; getRegion : p (option string)
-; modRegion (f : string -> string) : p unit
+Class UniversityAlg (p : Type -> Type) :=
+{ getName : p string
+; modifyName (f : string -> string) : p unit
+; getMathDep : p department
+; modifyMathDep (f : department -> department) : p unit
+(* ... *)
 }.
-
-Class Address' (p : Type -> Type) `{Monad p} :=
-{ zip' : MonadState nat p
-; getRegion' : p (option string)
-; modRegion' (f : string -> string) : p unit
-}.
-
-Definition modifyZip' {p} `{Address' p} (f : nat -> nat) : p unit :=
-  @mod _ _ _ _ zip' f.
