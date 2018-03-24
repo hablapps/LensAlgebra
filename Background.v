@@ -34,9 +34,9 @@ Class natTransLaws f g `{Functor f, Functor g} (φ : f ~> g) :=
 }.
 
 Definition composeNT {f g h : Type -> Type} `{Functor f, Functor g, Functor h}
-                     (nt1 : g ~> h) (nt2 : f ~> g) : f ~> h :=
-  mkNatTrans (fun _ fx => runNatTrans nt1 (runNatTrans nt2 fx)).
-Notation "f • g" := (composeNT f g) (at level 40, left associativity).
+                     (φ : g ~> h) (ψ : f ~> g) : f ~> h :=
+  mkNatTrans (fun _ fx => runNatTrans φ (runNatTrans ψ fx)).
+Notation "φ • ψ" := (composeNT φ ψ) (at level 40, left associativity).
 
 (* Monad *)
 
@@ -57,11 +57,11 @@ Class MonadLaws (m : Type -> Type) `{Monad m} :=
 
 Definition monad_morphism {f g : Type -> Type}
                          `{Monad f, Monad g}
-                          (morph : f ~> g) : Prop :=
-  (forall X (x : X), runNatTrans morph (ret x) = ret x) /\
+                          (φ : f ~> g) : Prop :=
+  (forall X (x : X), runNatTrans φ (ret x) = ret x) /\
   (forall A B (fa : f A) (f : A -> f B),
-    runNatTrans morph (fa >>= f) =
-    runNatTrans morph fa >>= (fun a => runNatTrans morph (f a))).
+    runNatTrans φ (fa >>= f) =
+    runNatTrans φ fa >>= (fun a => runNatTrans φ (f a))).
 
 Lemma reta_gtgt_retb_is_retb :
     forall m `{MonadLaws m},
@@ -314,11 +314,14 @@ Notation "ln %~ f" := (modifyLn ln f) (at level 40, no associativity).
 Definition identityLn A : lens A A :=
   mkLens id (fun _ => id).
 
-
 (* Alternative lens definition *)
 
 Definition lens' S A : Type := state A ~> state S.
 
 Definition lens_2_lens' {S A} (ln : lens S A) : lens' S A :=
-  mkNatTrans (fun X sax => mkState (fun s => let (x, a') := runState sax (view ln s)
-                                             in (x, update ln s a'))).
+  mkNatTrans (fun X sax => mkState (fun s => 
+    let (x, a') := runState sax (view ln s)
+    in (x, update ln s a'))).
+
+Definition composeLn' {S A B} (ln1 : lens' S A) (ln2 : lens' A B): lens' S B :=
+  ln1 • ln2.
