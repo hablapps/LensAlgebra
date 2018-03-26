@@ -1,8 +1,8 @@
 Set Warnings "-notation-overridden,-parsing".
 Require Import Program.Basics.
 Require Import Strings.String.
-Require Import Background.
-Require Import Lens.
+Require Import Sect2.
+Require Import Sect3.
 Require Import FunctionalExtensionality.
 
 

@@ -1,7 +1,7 @@
 Set Warnings "-notation-overridden,-parsing".
 Require Import Program.Basics.
 Require Import FunctionalExtensionality.
-Require Import Background.
+Require Import Sect2.
 
 
 (*********************)
