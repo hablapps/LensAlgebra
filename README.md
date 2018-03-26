@@ -1,6 +1,6 @@
-# Lens Algebra
+# Towards Optic-Based Algebraic Theories
 
-This repository contains Coq definitions and theorems revolving around very well-behaved *lenses* and *MonadState*. They are summarized in the following table.
+This repository contains the supplementary material associated to the article *Towards Optic-Based Algebraic Theories: the Case of Lenses* (J. López-González and Juan M. Serrano), submitted to *Trends in Functional Programming 2018*. In essence, it contains Coq definitions and theories revolving around very well-behaved *lenses* and *MonadState*. They are summarized in the following figure.
 
 ![alt text](figure.jpg)
 
