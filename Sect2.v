@@ -291,10 +291,13 @@ Qed.
 Record lens (S A : Type) : Type := mkLens
 { view : S -> A
 ; update : S -> A -> S
+; modify (f : A -> A) : S -> S := fun s => update s (f (view s))
 }.
 Arguments mkLens [S A].
 Arguments view [S A].
 Arguments update [S A].
+Arguments modify [S A].
+Notation "ln %~ f" := (modify ln f) (at level 40, no associativity).
 
 Record lensLaws {S A} (ln : lens S A) : Type :=
 { view_update : forall s, update ln s (view ln s) = s
@@ -306,10 +309,6 @@ Definition composeLn {S A B} (ln1 : lens S A) (ln2 : lens A B) : lens S B :=
   mkLens ((view ln2) ∘ (view ln1))
          (fun s => update ln1 s ∘ update ln2 (view ln1 s)).
 Notation "ln1 ▷ ln2" := (composeLn ln1 ln2) (at level 40, left associativity).
-
-Definition modifyLn {S A} (ln : lens S A) (f : A -> A) : S -> S :=
-  fun s => update ln s (f (view ln s)).
-Notation "ln %~ f" := (modifyLn ln f) (at level 40, no associativity).
 
 Definition identityLn A : lens A A :=
   mkLens id (fun _ => id).
