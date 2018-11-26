@@ -76,3 +76,4 @@ Record BX (m : Type -> Type) (A B : Type) := mkBX
 ; putL : A -> m unit
 ; putR : B -> m unit
 }.
+

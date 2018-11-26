@@ -324,3 +324,4 @@ Definition lens_2_lens' {S A} (ln : lens S A) : lens' S A :=
 
 Definition composeLn' {S A B} (ln1 : lens' S A) (ln2 : lens' A B): lens' S B :=
   ln1 • ln2.
+
