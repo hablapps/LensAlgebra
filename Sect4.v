@@ -344,27 +344,28 @@ Arguments mq [p Univ _ _ id].
 Arguments ev [p Univ _ _ id].
 Arguments mathDepLn [p Univ _ _ id].
 
-Definition duplicateDepBudget p Dep
+Definition doubleDepBudget p Dep
    `{MonadState Dep p}
     (data : DepartmentAlg p Dep) : p unit :=
   budgetLn data %~ (fun b => b * 2).
 
-Definition duplicateMathBudget p Univ
+Definition doubleMathBudget p Univ
    `{MonadState Univ p}
     (data : UniversityAlg p Univ) : p unit :=
   (mathDepLn data ▷ budgetLn (ev data)) %~ (fun b => b * 2).
 
-Definition duplicateMathBudgetR p Univ 
+Definition doubleMathBudgetR p Univ 
    `{MonadState Univ p}
     (data : UniversityAlg p Univ) : p nat :=
   let ln := mathDepLn data ▷ budgetLn (ev data)
   in ln %~ (fun b => b * 2) >> view ln.
 
 (* Coq doesn't infer that [q] is a monad and therefore the ugly syntax. *)
-Definition duplicateMathBudgetR' p Univ
+Definition doubleMathBudgetR' p Univ
    `{MonadState Univ p}
     (data : UniversityAlg p Univ) : p nat :=
   let bLn := budgetLn (ev data)
   in runNatTrans (mathDepLn data) (@bind _ _ (mq data) _ _
     (@modify _ _ _ _ (mq data) _ _ _ bLn (fun b => b * 2))
     (fun _ => @view _ _ _ _ (mq data) _ _ _ bLn)).
+

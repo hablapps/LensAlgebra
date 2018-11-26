@@ -203,9 +203,10 @@ Record UniversityAlg p Univ `{id : MonadState Univ p} :=
 ; mathDepLn : lensAlg p Dep
 }.
 
-Definition duplicateDepBudget p Dep
+Definition doubleDepBudget p Dep
    `{MonadState Dep p}
     (data : DepartmentAlg p Dep) : p unit :=
   budgetLn data %~ (fun b => b * 2).
 
 (* However, we can't implement an analogous for `duplicateUnivBudget`!!! *)
+

@@ -32,13 +32,13 @@ Definition mathDepLn : lens university department :=
 
 (* Business logic *)
 
-Definition duplicateDepBudget : department -> department :=
+Definition doubleDepBudget : department -> department :=
   budgetLn %~ (fun b => b * 2).
 
-Definition duplicateUnivBudget : university -> university :=
-  mathDepLn %~ duplicateDepBudget.
+Definition doubleUnivBudget : university -> university :=
+  mathDepLn %~ doubleDepBudget.
 
-Definition duplicateUnivBudget' : university -> university :=
+Definition doubleUnivBudget' : university -> university :=
   (mathDepLn ▷ budgetLn) %~ (fun b => b * 2).
 
 
@@ -55,3 +55,4 @@ Class UniversityAlg (p : Type -> Type) :=
 ; modifyMathDep (f : department -> department) : p unit
 (* ... *)
 }.
+
